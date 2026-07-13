@@ -25,6 +25,8 @@ public struct SystemPermissionStatus: PermissionStatusProviding {
 @Observable
 public final class SettingsModel {
     public var shortcut: HotKeyShortcut
+    public var appearanceMode: ClipFlowAppearanceMode
+    public var listDensity: ClipFlowListDensity
     public var launchAtLogin: Bool
     public var showStatusBarItem: Bool
     public var retentionPolicy: String
@@ -56,6 +58,12 @@ public final class SettingsModel {
         shortcut = HotKeyShortcut(
             rawValue: store.string(forKey: "showPanelHotKey") ?? ""
         ) ?? .commandShiftV
+        appearanceMode = ClipFlowAppearanceMode(
+            rawValue: store.string(forKey: "appearanceMode") ?? ""
+        ) ?? .system
+        listDensity = ClipFlowListDensity(
+            rawValue: store.string(forKey: "listDensity") ?? ""
+        ) ?? .comfortable
         launchAtLogin = store.bool(forKey: "launchAtLogin")
         showStatusBarItem = store.string(forKey: "showStatusBarItem") == nil
             ? true : store.bool(forKey: "showStatusBarItem")
@@ -89,6 +97,8 @@ public final class SettingsModel {
         maximumStorageMB = max(100, maximumStorageMB)
 
         store.set(shortcut.rawValue, forKey: "showPanelHotKey")
+        store.set(appearanceMode.rawValue, forKey: "appearanceMode")
+        store.set(listDensity.rawValue, forKey: "listDensity")
         store.set(launchAtLogin, forKey: "launchAtLogin")
         store.set(showStatusBarItem, forKey: "showStatusBarItem")
         store.set(retentionPolicy, forKey: "retentionPolicy")

@@ -19,6 +19,21 @@ struct SettingsModelTests {
         await model.refreshPermissions()
         #expect(model.isAccessibilityTrusted)
     }
+
+    @Test("persists appearance and density preferences")
+    func persistsAppearanceAndDensityPreferences() {
+        let store = MemorySettingsStore()
+        let permissions = FakePermissionStatus(accessibilityTrusted: false)
+        let model = SettingsModel(store: store, permissions: permissions)
+
+        model.appearanceMode = .dark
+        model.listDensity = .compact
+        model.save()
+
+        let restored = SettingsModel(store: store, permissions: permissions)
+        #expect(restored.appearanceMode == .dark)
+        #expect(restored.listDensity == .compact)
+    }
 }
 
 private final class MemorySettingsStore: SettingsStoring, @unchecked Sendable {

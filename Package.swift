@@ -4,6 +4,7 @@ import PackageDescription
 
 let package = Package(
     name: "ClipFlow",
+    defaultLocalization: "en",
     platforms: [.macOS(.v14)],
     products: [
         .library(name: "ClipFlowCore", targets: ["ClipFlowCore"]),
@@ -33,7 +34,8 @@ let package = Package(
         .target(name: "ClipFlowSystem", dependencies: ["ClipFlowCore"]),
         .target(
             name: "ClipFlowUI",
-            dependencies: ["ClipFlowCore", "ClipFlowStorage", "ClipFlowSystem"]
+            dependencies: ["ClipFlowCore", "ClipFlowStorage", "ClipFlowSystem"],
+            resources: [.process("Resources")]
         ),
         .executableTarget(
             name: "ClipFlowApp",

@@ -17,6 +17,12 @@ public struct ClipFlowRootView: View {
     }
 
     public var body: some View {
+        rootContent
+            .preferredColorScheme(settings.appearanceMode.colorScheme)
+    }
+
+    @ViewBuilder
+    private var rootContent: some View {
         if hasCompletedOnboarding {
             MainPanelView(
                 model: model,
