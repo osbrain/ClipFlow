@@ -4,8 +4,6 @@ import ClipFlowStorage
 import ClipFlowSystem
 import ClipFlowUI
 import Foundation
-import ImageIO
-import QuickLookThumbnailing
 import UniformTypeIdentifiers
 
 @MainActor
@@ -108,11 +106,11 @@ public final class AppClipboardVisualService: ClipboardVisualServing {
         }
 
         if let pdf = payloads.first(where: { $0.type == UTType.pdf.identifier }),
-           let data = await pdfThumbnail(
+           let thumbnail = await thumbnailService.pdfThumbnail(
                data: pdf.data,
                maximumPixelSize: maximumPixelSize
            ) {
-            return .pngData(data)
+            return .pngData(thumbnail.imageData)
         }
 
         if let url = existingFileURL(in: payloads) {
@@ -154,62 +152,4 @@ public final class AppClipboardVisualService: ClipboardVisualServing {
             }
     }
 
-    private nonisolated static func pdfThumbnail(
-        data: Data,
-        maximumPixelSize: Int
-    ) async -> Data? {
-        let fileManager = FileManager.default
-        let directory = fileManager.temporaryDirectory
-            .appendingPathComponent("com.clipflow.thumbnail", isDirectory: true)
-            .appendingPathComponent(UUID().uuidString, isDirectory: true)
-        let fileURL = directory.appendingPathComponent("document.pdf")
-
-        do {
-            try fileManager.createDirectory(
-                at: directory,
-                withIntermediateDirectories: true,
-                attributes: [.posixPermissions: 0o700]
-            )
-            try data.write(to: fileURL, options: [.atomic])
-            try fileManager.setAttributes(
-                [.posixPermissions: 0o600],
-                ofItemAtPath: fileURL.path
-            )
-        } catch {
-            try? fileManager.removeItem(at: directory)
-            return nil
-        }
-        defer { try? fileManager.removeItem(at: directory) }
-        guard !Task.isCancelled else { return nil }
-
-        let request = QLThumbnailGenerator.Request(
-            fileAt: fileURL,
-            size: CGSize(width: maximumPixelSize, height: maximumPixelSize),
-            scale: 1,
-            representationTypes: .thumbnail
-        )
-        do {
-            let representation = try await QLThumbnailGenerator.shared
-                .generateBestRepresentation(for: request)
-            guard !Task.isCancelled else { return nil }
-            return pngData(for: representation.cgImage)
-        } catch {
-            return nil
-        }
-    }
-
-    private nonisolated static func pngData(for image: CGImage) -> Data? {
-        let output = NSMutableData()
-        guard let destination = CGImageDestinationCreateWithData(
-            output,
-            UTType.png.identifier as CFString,
-            1,
-            nil
-        ) else {
-            return nil
-        }
-        CGImageDestinationAddImage(destination, image, nil)
-        guard CGImageDestinationFinalize(destination) else { return nil }
-        return output as Data
-    }
 }
