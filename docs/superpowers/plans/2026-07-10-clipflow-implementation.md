@@ -424,7 +424,7 @@ git commit -m "feat: monitor macOS clipboard changes"
 - Create: `Tests/ClipFlowCoreTests/PasteModeResolverTests.swift`
 - Create: `Tests/ClipFlowSystemTests/PasteCoordinatorTests.swift`
 
-- [ ] **Step 1: Write failing mode and fallback tests**
+- [x] **Step 1: Write failing mode and fallback tests**
 
 ```swift
 func testPerApplicationModeOverridesDefault() {
@@ -442,17 +442,17 @@ func testPasteWritesClipboardEvenWhenAccessibilityIsDenied() async throws {
 }
 ```
 
-- [ ] **Step 2: Verify RED**
+- [x] **Step 2: Verify RED**
 
 Run: `swift test --filter 'PasteModeResolverTests|PasteCoordinatorTests'`
 
 Expected: compilation fails for paste APIs.
 
-- [ ] **Step 3: Implement original/plain writeback and Accessibility posting**
+- [x] **Step 3: Implement original/plain writeback and Accessibility posting**
 
 Original mode restores all item representations in stable item/type order. Plain mode chooses UTF-8 text, then extracts attributed-string text from RTF/HTML. The coordinator records the target app, writes the board, activates the target, and posts Command-V only when `AXIsProcessTrusted()` is true.
 
-- [ ] **Step 4: Verify GREEN and commit**
+- [x] **Step 4: Verify GREEN and commit**
 
 Run: `swift test`
 

@@ -2,7 +2,7 @@ import AppKit
 import ClipFlowCore
 import Foundation
 
-public final class SystemClipboard: PasteboardAccess, @unchecked Sendable {
+public final class SystemClipboard: PasteboardAccess, ClipboardWriting, @unchecked Sendable {
     private let pasteboard: NSPasteboard
 
     public init(pasteboard: NSPasteboard = .general) {
@@ -31,5 +31,64 @@ public final class SystemClipboard: PasteboardAccess, @unchecked Sendable {
             sourceBundleID: sourceApplication?.bundleIdentifier,
             items: items
         )
+    }
+
+    @discardableResult
+    public func write(payloads: [NormalizedPayload], mode: PasteMode) throws -> Int {
+        let objects: [NSPasteboardItem]
+        switch mode {
+        case .original:
+            objects = Dictionary(grouping: payloads, by: \.itemIndex)
+                .sorted { $0.key < $1.key }
+                .map { _, payloads in
+                    let item = NSPasteboardItem()
+                    for payload in payloads {
+                        item.setData(payload.data, forType: NSPasteboard.PasteboardType(payload.type))
+                    }
+                    return item
+                }
+        case .plainText:
+            guard let text = Self.plainText(from: payloads) else {
+                throw PasteSystemError.noPlainTextRepresentation
+            }
+            let item = NSPasteboardItem()
+            item.setString(text, forType: .string)
+            objects = [item]
+        }
+
+        pasteboard.clearContents()
+        guard pasteboard.writeObjects(objects) else {
+            throw PasteSystemError.pasteboardWriteFailed
+        }
+        return pasteboard.changeCount
+    }
+
+    private static func plainText(from payloads: [NormalizedPayload]) -> String? {
+        let preferredTypes = [
+            "public.utf8-plain-text",
+            "public.plain-text",
+            "public.url",
+            "public.file-url"
+        ]
+        for type in preferredTypes {
+            if let payload = payloads.first(where: { $0.type == type }),
+               let text = String(data: payload.data, encoding: .utf8) {
+                return text
+            }
+        }
+
+        if let rtf = payloads.first(where: { $0.type == "public.rtf" }),
+           let attributed = NSAttributedString(rtf: rtf.data, documentAttributes: nil) {
+            return attributed.string
+        }
+        if let html = payloads.first(where: { $0.type == "public.html" }),
+           let attributed = NSAttributedString(
+               html: html.data,
+               options: [.documentType: NSAttributedString.DocumentType.html],
+               documentAttributes: nil
+           ) {
+            return attributed.string
+        }
+        return nil
     }
 }
