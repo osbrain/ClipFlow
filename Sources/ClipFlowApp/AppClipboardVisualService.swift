@@ -7,7 +7,7 @@ import Foundation
 import UniformTypeIdentifiers
 
 @MainActor
-public final class AppClipboardVisualService: ClipboardVisualServing {
+final class AppClipboardVisualService: ClipboardVisualServing {
     private enum LoadedVisual: Sendable {
         case pngData(Data)
         case fileURL(URL)
@@ -18,7 +18,7 @@ public final class AppClipboardVisualService: ClipboardVisualServing {
     private let thumbnailService: ClipboardThumbnailService
     private let cache = NSCache<NSString, NSImage>()
 
-    public init(
+    init(
         repository: ClipboardRepository,
         applicationIconProvider: ApplicationIconProvider = ApplicationIconProvider(),
         thumbnailService: ClipboardThumbnailService = ClipboardThumbnailService()
@@ -28,7 +28,7 @@ public final class AppClipboardVisualService: ClipboardVisualServing {
         self.thumbnailService = thumbnailService
     }
 
-    public func metadataVisual(for item: ClipboardItem) -> ClipboardVisualDescriptor {
+    func metadataVisual(for item: ClipboardItem) -> ClipboardVisualDescriptor {
         ClipboardVisualDescriptor(
             itemID: item.id,
             applicationIcon: applicationIconProvider.icon(
@@ -42,7 +42,7 @@ public final class AppClipboardVisualService: ClipboardVisualServing {
         )
     }
 
-    public func loadThumbnail(
+    func loadThumbnail(
         for item: ClipboardItem,
         maximumPixelSize: Int
     ) async -> NSImage? {
