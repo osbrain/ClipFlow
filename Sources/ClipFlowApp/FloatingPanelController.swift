@@ -42,7 +42,7 @@ final class FloatingPanelController: NSWindowController, NSWindowDelegate {
 
     func show() {
         guard let panel = window else { return }
-        let screen = Self.activeScreen ?? NSScreen.main
+        let screen = Self.frontmostApplicationScreen ?? Self.pointerScreen ?? NSScreen.main
         let desiredFrame = restoredFrame ?? Self.centeredFrame(
             size: panel.frame.size,
             in: screen?.visibleFrame ?? panel.frame
@@ -79,9 +79,40 @@ final class FloatingPanelController: NSWindowController, NSWindowDelegate {
             : nil
     }
 
-    private static var activeScreen: NSScreen? {
+    private static var pointerScreen: NSScreen? {
         let pointer = NSEvent.mouseLocation
         return NSScreen.screens.first { NSMouseInRect(pointer, $0.frame, false) }
+    }
+
+    private static var frontmostApplicationScreen: NSScreen? {
+        guard let processIdentifier = NSWorkspace.shared.frontmostApplication?.processIdentifier,
+              let windows = CGWindowListCopyWindowInfo(
+                  [.optionOnScreenOnly, .excludeDesktopElements],
+                  kCGNullWindowID
+              ) as? [[String: Any]] else {
+            return nil
+        }
+
+        let applicationWindow = windows
+            .filter {
+                ($0[kCGWindowOwnerPID as String] as? NSNumber)?.int32Value == processIdentifier
+            }
+            .compactMap { window -> CGRect? in
+                guard let bounds = window[kCGWindowBounds as String] as? [String: Any],
+                      let x = (bounds["X"] as? NSNumber)?.doubleValue,
+                      let y = (bounds["Y"] as? NSNumber)?.doubleValue,
+                      let width = (bounds["Width"] as? NSNumber)?.doubleValue,
+                      let height = (bounds["Height"] as? NSNumber)?.doubleValue else {
+                    return nil
+                }
+                return CGRect(x: x, y: y, width: width, height: height)
+            }
+            .max { $0.width * $0.height < $1.width * $1.height }
+
+        guard let applicationWindow else { return nil }
+        return NSScreen.screens.first {
+            $0.frame.minX <= applicationWindow.midX && applicationWindow.midX < $0.frame.maxX
+        }
     }
 
     private static func centeredFrame(size: NSSize, in visibleFrame: NSRect) -> NSRect {

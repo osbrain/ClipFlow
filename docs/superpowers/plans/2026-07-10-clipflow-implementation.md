@@ -515,7 +515,7 @@ git commit -m "feat: add global shortcut and floating panel"
 - Create: `Sources/ClipFlowApp/CategorySidebar.swift`
 - Create: `Tests/ClipFlowAppTests/AppModelTests.swift`
 
-- [ ] **Step 1: Write failing orchestration tests**
+- [x] **Step 1: Write failing orchestration tests**
 
 ```swift
 @MainActor func testSearchReloadSelectsFirstResultAndPasteMarksUsage() async throws {
@@ -529,17 +529,17 @@ git commit -m "feat: add global shortcut and floating panel"
 }
 ```
 
-- [ ] **Step 2: Verify RED**
+- [x] **Step 2: Verify RED**
 
 Run: `swift test --filter AppModelTests`
 
 Expected: compilation fails for `AppModel` and repository protocol conformances.
 
-- [ ] **Step 3: Implement observable state and Clipi-equivalent layout**
+- [x] **Step 3: Implement observable state and Clipi-equivalent layout**
 
 The sidebar exposes system and user categories, the center list virtualizes rows and thumbnails, and the details column is configurable. Keyboard commands cover arrows, Return, Command-Return, Space, delete, favorite, category assignment, and rename. Empty, loading, permission, unavailable-payload, and storage-error states remain navigable.
 
-- [ ] **Step 4: Verify GREEN and commit**
+- [x] **Step 4: Verify GREEN and commit**
 
 Run: `swift test --filter AppModelTests && swift test`
 

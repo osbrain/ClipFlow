@@ -185,6 +185,52 @@ public final class ClipboardRepository: @unchecked Sendable {
         }
     }
 
+    public func markUsed(_ id: UUID) throws {
+        try database.execute(
+            "UPDATE clipboard_items SET last_used_at = ?, updated_at = ? WHERE id = ?;",
+            bindings: [
+                .real(Date().timeIntervalSince1970),
+                .real(Date().timeIntervalSince1970),
+                .text(id.uuidString)
+            ]
+        )
+    }
+
+    public func setFavorite(_ favorite: Bool, for id: UUID) throws {
+        try database.execute(
+            "UPDATE clipboard_items SET is_favorite = ?, updated_at = ? WHERE id = ?;",
+            bindings: [
+                .integer(favorite ? 1 : 0),
+                .real(Date().timeIntervalSince1970),
+                .text(id.uuidString)
+            ]
+        )
+    }
+
+    public func rename(_ id: UUID, title: String?) throws {
+        let trimmed = title?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let storedTitle = trimmed?.isEmpty == false ? trimmed : nil
+        try database.execute(
+            "UPDATE clipboard_items SET custom_title = ?, updated_at = ? WHERE id = ?;",
+            bindings: [
+                storedTitle.map(SQLValue.text) ?? .null,
+                .real(Date().timeIntervalSince1970),
+                .text(id.uuidString)
+            ]
+        )
+    }
+
+    public func delete(_ id: UUID) throws {
+        let references = try externalReferences(for: id)
+        try database.execute(
+            "DELETE FROM clipboard_items WHERE id = ?;",
+            bindings: [.text(id.uuidString)]
+        )
+        for reference in references {
+            try? externalPayloadStore.delete(reference)
+        }
+    }
+
     public func createCategory(name: String) throws -> ClipCategory {
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else {
@@ -205,6 +251,19 @@ public final class ClipboardRepository: @unchecked Sendable {
             ]
         )
         return category
+    }
+
+    public func allCategories() throws -> [ClipCategory] {
+        try database.query(
+            "SELECT id, name, created_at, sort_order FROM clip_categories ORDER BY sort_order, created_at;"
+        ).compactMap { row in
+            guard let id = row.uuid("id"), let name = row.string("name"),
+                  let createdAt = row.date("created_at") else { return nil }
+            return ClipCategory(
+                id: id, name: name, createdAt: createdAt,
+                sortOrder: Int(row.integer("sort_order") ?? 0)
+            )
+        }
     }
 
     public func assign(itemID: UUID, categoryID: UUID) throws {

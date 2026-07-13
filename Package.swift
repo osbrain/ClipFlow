@@ -9,6 +9,7 @@ let package = Package(
         .library(name: "ClipFlowCore", targets: ["ClipFlowCore"]),
         .library(name: "ClipFlowStorage", targets: ["ClipFlowStorage"]),
         .library(name: "ClipFlowSystem", targets: ["ClipFlowSystem"]),
+        .library(name: "ClipFlowUI", targets: ["ClipFlowUI"]),
         .executable(name: "ClipFlowApp", targets: ["ClipFlowApp"]),
         .executable(name: "ClipFlowCoreTests", targets: ["ClipFlowCoreTests"])
     ],
@@ -30,10 +31,17 @@ let package = Package(
             ]
         ),
         .target(name: "ClipFlowSystem", dependencies: ["ClipFlowCore"]),
-        .executableTarget(name: "ClipFlowApp", dependencies: ["ClipFlowCore"]),
+        .target(
+            name: "ClipFlowUI",
+            dependencies: ["ClipFlowCore", "ClipFlowStorage", "ClipFlowSystem"]
+        ),
+        .executableTarget(
+            name: "ClipFlowApp",
+            dependencies: ["ClipFlowCore", "ClipFlowStorage", "ClipFlowSystem", "ClipFlowUI"]
+        ),
         .executableTarget(
             name: "ClipFlowCoreTests",
-            dependencies: ["ClipFlowCore", "ClipFlowStorage", "ClipFlowSystem"],
+            dependencies: ["ClipFlowCore", "ClipFlowStorage", "ClipFlowSystem", "ClipFlowUI"],
             path: "Tests/ClipFlowCoreTests",
             swiftSettings: [
                 .unsafeFlags([
