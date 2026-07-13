@@ -160,7 +160,7 @@ git commit -m "feat: scaffold ClipFlow Swift workspace"
 - Create: `Sources/ClipFlowCore/ClipboardNormalizer.swift`
 - Create: `Tests/ClipFlowCoreTests/ClipboardNormalizerTests.swift`
 
-- [ ] **Step 1: Write failing normalization tests**
+- [x] **Step 1: Write failing normalization tests**
 
 ```swift
 import XCTest
@@ -191,23 +191,23 @@ final class ClipboardNormalizerTests: XCTestCase {
 }
 ```
 
-- [ ] **Step 2: Verify RED**
+- [x] **Step 2: Verify RED**
 
 Run: `swift test --filter ClipboardNormalizerTests`
 
 Expected: compilation fails because the raw and normalized capture APIs do not exist.
 
-- [ ] **Step 3: Implement immutable capture types and normalizer**
+- [x] **Step 3: Implement immutable capture types and normalizer**
 
 Implement `RawClipboardRepresentation`, `RawClipboardItem`, `RawClipboardCapture`, `NormalizedPayload`, and `NormalizedCapture`. `ClipboardNormalizer.normalize` must filter per-item limits, reject an empty result with `ClipboardNormalizationError.noUsablePayload`, normalize CRLF text to LF, classify the aggregate kind, derive preview/search text, and hash a deterministic stream of item index, type, length, and bytes using `CryptoKit.SHA256`.
 
-- [ ] **Step 4: Verify GREEN**
+- [x] **Step 4: Verify GREEN**
 
 Run: `swift test --filter ClipboardNormalizerTests && swift test`
 
 Expected: both normalization tests and the full suite pass.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add Sources/ClipFlowCore Tests/ClipFlowCoreTests
