@@ -99,7 +99,7 @@ public struct SystemApplicationActivator: ApplicationActivating {
         ) else {
             return false
         }
-        return application.activate(options: [.activateIgnoringOtherApps])
+        return application.activate(options: [])
     }
 }
 
@@ -108,4 +108,3 @@ public enum PasteSystemError: Error, Equatable, Sendable {
     case pasteboardWriteFailed
     case noPlainTextRepresentation
 }
-

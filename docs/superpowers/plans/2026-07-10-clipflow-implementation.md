@@ -471,7 +471,7 @@ git commit -m "feat: restore and paste clipboard items"
 - Create: `Sources/ClipFlowApp/FloatingPanelController.swift`
 - Create: `Tests/ClipFlowCoreTests/PanelInputStateTests.swift`
 
-- [ ] **Step 1: Write failing Escape/navigation state tests**
+- [x] **Step 1: Write failing Escape/navigation state tests**
 
 ```swift
 func testEscapeClearsSearchBeforeDismissingPanel() {
@@ -482,17 +482,17 @@ func testEscapeClearsSearchBeforeDismissingPanel() {
 }
 ```
 
-- [ ] **Step 2: Verify RED**
+- [x] **Step 2: Verify RED**
 
 Run: `swift test --filter PanelInputStateTests`
 
 Expected: compilation fails for `PanelInputState`.
 
-- [ ] **Step 3: Implement state transitions, Carbon registration, and NSPanel**
+- [x] **Step 3: Implement state transitions, Carbon registration, and NSPanel**
 
 Register Command-Shift-V with `RegisterEventHotKey`, expose preset alternatives, and unregister on change. Build a non-activating-to-activating floating panel that becomes key on show, clamps its saved frame to the active screen visible frame, sends focus to search, and dismisses according to `PanelInputState`.
 
-- [ ] **Step 4: Verify GREEN and commit**
+- [x] **Step 4: Verify GREEN and commit**
 
 Run: `swift test --filter PanelInputStateTests && swift test`
 
