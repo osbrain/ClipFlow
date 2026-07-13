@@ -273,7 +273,7 @@ git commit -m "feat: add search and retention rules"
 - Create: `Sources/ClipFlowStorage/ExternalPayloadStore.swift`
 - Create: `Tests/ClipFlowStorageTests/ExternalPayloadStoreTests.swift`
 
-- [ ] **Step 1: Write a failing round-trip and tamper test**
+- [x] **Step 1: Write a failing round-trip and tamper test**
 
 ```swift
 func testEncryptedPayloadRoundTripAndTamperDetection() throws {
@@ -289,17 +289,17 @@ func testEncryptedPayloadRoundTripAndTamperDetection() throws {
 }
 ```
 
-- [ ] **Step 2: Verify RED**
+- [x] **Step 2: Verify RED**
 
 Run: `swift test --filter ExternalPayloadStoreTests`
 
 Expected: compilation fails for `ExternalPayloadStore`.
 
-- [ ] **Step 3: Implement versioned AES-GCM files and Keychain access**
+- [x] **Step 3: Implement versioned AES-GCM files and Keychain access**
 
 The file format is magic `CLPF`, version byte `1`, sealed combined AES-GCM bytes, original size, and SHA-256. Writes use a sibling temporary file followed by atomic replacement. `KeychainKeyStore` stores 32 random bytes with `kSecAttrSynchronizable=false` and `kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly`.
 
-- [ ] **Step 4: Verify GREEN and commit**
+- [x] **Step 4: Verify GREEN and commit**
 
 Run: `swift test --filter ExternalPayloadStoreTests && swift test`
 

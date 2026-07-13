@@ -7,15 +7,19 @@ let package = Package(
     platforms: [.macOS(.v14)],
     products: [
         .library(name: "ClipFlowCore", targets: ["ClipFlowCore"]),
+        .library(name: "ClipFlowStorage", targets: ["ClipFlowStorage"]),
+        .library(name: "ClipFlowSystem", targets: ["ClipFlowSystem"]),
         .executable(name: "ClipFlowApp", targets: ["ClipFlowApp"]),
         .executable(name: "ClipFlowCoreTests", targets: ["ClipFlowCoreTests"])
     ],
     targets: [
         .target(name: "ClipFlowCore"),
+        .target(name: "ClipFlowStorage", dependencies: ["ClipFlowCore"]),
+        .target(name: "ClipFlowSystem", dependencies: ["ClipFlowCore"]),
         .executableTarget(name: "ClipFlowApp", dependencies: ["ClipFlowCore"]),
         .executableTarget(
             name: "ClipFlowCoreTests",
-            dependencies: ["ClipFlowCore"],
+            dependencies: ["ClipFlowCore", "ClipFlowStorage", "ClipFlowSystem"],
             path: "Tests/ClipFlowCoreTests",
             swiftSettings: [
                 .unsafeFlags([
