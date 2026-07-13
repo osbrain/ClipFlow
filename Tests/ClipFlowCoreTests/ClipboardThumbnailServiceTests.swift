@@ -30,9 +30,12 @@ struct ClipboardThumbnailServiceTests {
         #expect(thumbnail == nil)
     }
 
-    @Test("cancelling PDF generation cancels Quick Look and removes its temporary file")
-    func cancellingPDFGenerationCancelsQuickLookAndCleansUp() async throws {
-        let generator = FakeQuickLookThumbnailGenerator()
+    @Test("cancelling before Quick Look submission does not generate or cancel a request")
+    func cancellingBeforeSubmissionSkipsQuickLook() async throws {
+        let makeRequestGate = BlockingGate()
+        let generator = FakeQuickLookThumbnailGenerator(
+            makeRequestGate: makeRequestGate
+        )
         let service = ClipboardThumbnailService(quickLookGenerator: generator)
         let task = Task {
             await service.pdfThumbnail(
@@ -41,13 +44,42 @@ struct ClipboardThumbnailServiceTests {
             )
         }
 
-        let request = await generator.waitForGeneratedRequest()
+        await makeRequestGate.waitUntilEntered()
+        let request = try #require(generator.firstCreatedRequest)
         #expect(FileManager.default.fileExists(atPath: request.fileURL.path))
 
         task.cancel()
+        makeRequestGate.release()
         let thumbnail = await task.value
 
         #expect(thumbnail == nil)
+        #expect(generator.generatedRequestIDs.isEmpty)
+        #expect(generator.cancelledRequestIDs.isEmpty)
+        #expect(!FileManager.default.fileExists(atPath: request.fileURL.path))
+    }
+
+    @Test("cancelling after Quick Look submission cancels the request exactly once")
+    func cancellingAfterSubmissionCancelsExactlyOnce() async throws {
+        let generateGate = BlockingGate()
+        let generator = FakeQuickLookThumbnailGenerator(generateGate: generateGate)
+        let service = ClipboardThumbnailService(quickLookGenerator: generator)
+        let task = Task {
+            await service.pdfThumbnail(
+                data: Data("%PDF-1.7".utf8),
+                maximumPixelSize: 64
+            )
+        }
+
+        await generateGate.waitUntilEntered()
+        let request = try #require(generator.firstCreatedRequest)
+        #expect(FileManager.default.fileExists(atPath: request.fileURL.path))
+
+        task.cancel()
+        generateGate.release()
+        let thumbnail = await task.value
+
+        #expect(thumbnail == nil)
+        #expect(generator.generatedRequestIDs == [request.id])
         #expect(generator.cancelledRequestIDs == [request.id])
         #expect(!FileManager.default.fileExists(atPath: request.fileURL.path))
 
@@ -67,10 +99,28 @@ private final class FakeQuickLookThumbnailGenerator:
     QuickLookThumbnailGenerating,
     @unchecked Sendable {
     private let lock = NSLock()
+    private let makeRequestGate: BlockingGate?
+    private let generateGate: BlockingGate?
+    private var createdRequests: [QuickLookThumbnailRequest] = []
     private var generatedRequests: [QuickLookThumbnailRequest] = []
     private var cancelledIDs: [UUID] = []
     private var completions: [UUID: @Sendable (GeneratedThumbnail?) -> Void] = [:]
-    private var requestWaiter: CheckedContinuation<QuickLookThumbnailRequest, Never>?
+
+    init(
+        makeRequestGate: BlockingGate? = nil,
+        generateGate: BlockingGate? = nil
+    ) {
+        self.makeRequestGate = makeRequestGate
+        self.generateGate = generateGate
+    }
+
+    var firstCreatedRequest: QuickLookThumbnailRequest? {
+        lock.withLock { createdRequests.first }
+    }
+
+    var generatedRequestIDs: [UUID] {
+        lock.withLock { generatedRequests.map(\.id) }
+    }
 
     var cancelledRequestIDs: [UUID] {
         lock.withLock { cancelledIDs }
@@ -80,20 +130,21 @@ private final class FakeQuickLookThumbnailGenerator:
         fileURL: URL,
         maximumPixelSize: Int
     ) -> QuickLookThumbnailRequest {
-        QuickLookThumbnailRequest(fileURL: fileURL)
+        let request = QuickLookThumbnailRequest(fileURL: fileURL)
+        lock.withLock { createdRequests.append(request) }
+        makeRequestGate?.enterAndWait()
+        return request
     }
 
     func generate(
         _ request: QuickLookThumbnailRequest,
         completion: @escaping @Sendable (GeneratedThumbnail?) -> Void
     ) {
-        let waiter = lock.withLock { () -> CheckedContinuation<QuickLookThumbnailRequest, Never>? in
+        lock.withLock {
             generatedRequests.append(request)
             completions[request.id] = completion
-            defer { requestWaiter = nil }
-            return requestWaiter
         }
-        waiter?.resume(returning: request)
+        generateGate?.enterAndWait()
     }
 
     func cancel(_ request: QuickLookThumbnailRequest) {
@@ -108,16 +159,38 @@ private final class FakeQuickLookThumbnailGenerator:
         completion?(thumbnail)
     }
 
-    func waitForGeneratedRequest() async -> QuickLookThumbnailRequest {
-        return await withCheckedContinuation { continuation in
-            let request = lock.withLock { () -> QuickLookThumbnailRequest? in
-                if let request = generatedRequests.first {
-                    return request
-                }
-                requestWaiter = continuation
-                return nil
-            }
-            request.map { continuation.resume(returning: $0) }
+}
+
+private final class BlockingGate: @unchecked Sendable {
+    private let lock = NSLock()
+    private let releaseSemaphore = DispatchSemaphore(value: 0)
+    private var entered = false
+    private var enteredWaiter: CheckedContinuation<Void, Never>?
+
+    func enterAndWait() {
+        let waiter = lock.withLock { () -> CheckedContinuation<Void, Never>? in
+            entered = true
+            defer { enteredWaiter = nil }
+            return enteredWaiter
         }
+        waiter?.resume()
+        releaseSemaphore.wait()
+    }
+
+    func waitUntilEntered() async {
+        await withCheckedContinuation { continuation in
+            let isEntered = lock.withLock {
+                if entered { return true }
+                enteredWaiter = continuation
+                return false
+            }
+            if isEntered {
+                continuation.resume()
+            }
+        }
+    }
+
+    func release() {
+        releaseSemaphore.signal()
     }
 }

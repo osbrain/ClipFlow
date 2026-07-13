@@ -82,21 +82,25 @@ public struct ClipboardThumbnailService: Sendable {
         let state = QuickLookContinuationState()
         let thumbnail = await withTaskCancellationHandler {
             await withCheckedContinuation { continuation in
-                guard state.install(continuation) else {
+                guard state.beginSubmission(with: continuation) else {
                     continuation.resume(returning: nil)
                     return
                 }
                 generator.generate(request) { thumbnail in
                     state.complete(with: thumbnail)
                 }
-                if state.isCancelled {
+                let action = state.finishSubmission()
+                if action.shouldCancelRequest {
                     generator.cancel(request)
                 }
+                action.continuation?.resume(returning: nil)
             }
         } onCancel: {
-            let continuation = state.cancel()
-            generator.cancel(request)
-            continuation?.resume(returning: nil)
+            let action = state.cancel()
+            if action.shouldCancelRequest {
+                generator.cancel(request)
+            }
+            action.continuation?.resume(returning: nil)
         }
         guard !Task.isCancelled else { return nil }
         return thumbnail
@@ -179,29 +183,53 @@ private final class SystemQuickLookThumbnailGenerator:
 }
 
 private final class QuickLookContinuationState: @unchecked Sendable {
-    private let lock = NSLock()
-    private var continuation: CheckedContinuation<GeneratedThumbnail?, Never>?
-    private var completed = false
-    private var cancelled = false
-
-    var isCancelled: Bool {
-        lock.withLock { cancelled }
+    private enum Phase {
+        case ready
+        case submitting
+        case submitted
+        case finished
     }
 
-    func install(
-        _ continuation: CheckedContinuation<GeneratedThumbnail?, Never>
+    private let lock = NSLock()
+    private var continuation: CheckedContinuation<GeneratedThumbnail?, Never>?
+    private var phase = Phase.ready
+    private var cancellationRequested = false
+
+    func beginSubmission(
+        with continuation: CheckedContinuation<GeneratedThumbnail?, Never>
     ) -> Bool {
         lock.withLock {
-            guard !completed else { return false }
+            guard phase == .ready else { return false }
+            phase = .submitting
             self.continuation = continuation
             return true
         }
     }
 
+    func finishSubmission() -> QuickLookCancellationAction {
+        lock.withLock {
+            guard phase == .submitting else { return .none }
+            if cancellationRequested {
+                phase = .finished
+                let continuation = self.continuation
+                self.continuation = nil
+                return QuickLookCancellationAction(
+                    shouldCancelRequest: true,
+                    continuation: continuation
+                )
+            }
+            phase = .submitted
+            return .none
+        }
+    }
+
     func complete(with thumbnail: GeneratedThumbnail?) {
         let continuation: CheckedContinuation<GeneratedThumbnail?, Never>? = lock.withLock {
-            guard !completed else { return nil }
-            completed = true
+            guard !cancellationRequested,
+                  phase == .submitting || phase == .submitted else {
+                return nil
+            }
+            phase = .finished
             let continuation = self.continuation
             self.continuation = nil
             return continuation
@@ -209,16 +237,40 @@ private final class QuickLookContinuationState: @unchecked Sendable {
         continuation?.resume(returning: thumbnail)
     }
 
-    func cancel() -> CheckedContinuation<GeneratedThumbnail?, Never>? {
+    func cancel() -> QuickLookCancellationAction {
         lock.withLock {
-            cancelled = true
-            guard !completed else { return nil }
-            completed = true
-            let continuation = self.continuation
-            self.continuation = nil
-            return continuation
+            switch phase {
+            case .ready:
+                phase = .finished
+                cancellationRequested = true
+                return .none
+
+            case .submitting:
+                cancellationRequested = true
+                return .none
+
+            case .submitted:
+                phase = .finished
+                cancellationRequested = true
+                let continuation = self.continuation
+                self.continuation = nil
+                return QuickLookCancellationAction(
+                    shouldCancelRequest: true,
+                    continuation: continuation
+                )
+
+            case .finished:
+                return .none
+            }
         }
     }
+}
+
+private struct QuickLookCancellationAction {
+    static let none = Self(shouldCancelRequest: false, continuation: nil)
+
+    let shouldCancelRequest: Bool
+    let continuation: CheckedContinuation<GeneratedThumbnail?, Never>?
 }
 
 private func generatedThumbnail(from image: CGImage) -> GeneratedThumbnail? {
