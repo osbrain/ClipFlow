@@ -8,4 +8,6 @@ enum ClipFlowVisualStyle {
     static let selectedBorderOpacity = 0.9
     static let panelPadding: CGFloat = 12
     static let sectionSpacing: CGFloat = 16
+    static let hairlineColor = Color(nsColor: .separatorColor)
+    static let hoverFillColor = Color.primary.opacity(0.08)
 }

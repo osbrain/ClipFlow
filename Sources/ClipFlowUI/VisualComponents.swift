@@ -2,12 +2,12 @@ import AppKit
 import ClipFlowCore
 import SwiftUI
 
-public struct GlassSection<Content: View>: View {
+struct GlassSection<Content: View>: View {
     private let title: String
     private let icon: String
     private let content: Content
 
-    public init(
+    init(
         title: String,
         icon: String,
         @ViewBuilder content: () -> Content
@@ -17,7 +17,7 @@ public struct GlassSection<Content: View>: View {
         self.content = content()
     }
 
-    public var body: some View {
+    var body: some View {
         VStack(alignment: .leading, spacing: ClipFlowVisualStyle.sectionSpacing) {
             Label(title, systemImage: icon)
                 .font(.headline)
@@ -28,18 +28,18 @@ public struct GlassSection<Content: View>: View {
         .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 14))
         .overlay {
             RoundedRectangle(cornerRadius: 14)
-                .stroke(Color.white.opacity(ClipFlowVisualStyle.hairlineOpacity))
+                .stroke(ClipFlowVisualStyle.hairlineColor)
         }
     }
 }
 
-public struct GlassRow<Content: View>: View {
+struct GlassRow<Content: View>: View {
     private let icon: String
     private let title: String
     private let subtitle: String?
     private let content: Content
 
-    public init(
+    init(
         icon: String,
         title: String,
         subtitle: String? = nil,
@@ -51,12 +51,13 @@ public struct GlassRow<Content: View>: View {
         self.content = content()
     }
 
-    public var body: some View {
+    var body: some View {
         HStack(spacing: 12) {
             Image(systemName: icon)
                 .font(.system(size: 16, weight: .semibold))
                 .foregroundStyle(.tint)
                 .frame(width: 24)
+                .accessibilityHidden(true)
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)
@@ -76,19 +77,19 @@ public struct GlassRow<Content: View>: View {
         .background(.thinMaterial, in: RoundedRectangle(cornerRadius: ClipFlowVisualStyle.cardRadius))
         .overlay {
             RoundedRectangle(cornerRadius: ClipFlowVisualStyle.cardRadius)
-                .stroke(Color.white.opacity(ClipFlowVisualStyle.hairlineOpacity))
+                .stroke(ClipFlowVisualStyle.hairlineColor)
         }
     }
 }
 
-public struct FilterChip: View {
+struct FilterChip: View {
     private let title: String
     private let icon: String
     private let isSelected: Bool
     private let action: () -> Void
     @State private var isHovering = false
 
-    public init(
+    init(
         title: String,
         icon: String,
         isSelected: Bool,
@@ -100,7 +101,7 @@ public struct FilterChip: View {
         self.action = action
     }
 
-    public var body: some View {
+    var body: some View {
         Button(action: action) {
             Label(title, systemImage: icon)
                 .font(.callout.weight(.medium))
@@ -114,7 +115,6 @@ public struct FilterChip: View {
         }
         .buttonStyle(.plain)
         .accessibilityAddTraits(isSelected ? .isSelected : [])
-        .accessibilityValue(isSelected ? "Selected" : "Not selected")
         .help(title)
         .onHover { isHovering = $0 }
     }
@@ -123,27 +123,27 @@ public struct FilterChip: View {
         if isSelected {
             return Color.accentColor.opacity(ClipFlowVisualStyle.selectedFillOpacity)
         }
-        return Color.white.opacity(isHovering ? 0.08 : 0)
+        return isHovering ? ClipFlowVisualStyle.hoverFillColor : .clear
     }
 
     private var borderColor: Color {
         if isSelected {
             return Color.accentColor.opacity(ClipFlowVisualStyle.selectedBorderOpacity)
         }
-        return Color.white.opacity(ClipFlowVisualStyle.hairlineOpacity)
+        return ClipFlowVisualStyle.hairlineColor
     }
 }
 
-public struct ClipboardKindBadge: View {
+struct ClipboardKindBadge: View {
     private let kind: ClipboardKind
     private let size: CGFloat
 
-    public init(kind: ClipboardKind, size: CGFloat = 36) {
+    init(kind: ClipboardKind, size: CGFloat = 36) {
         self.kind = kind
         self.size = size
     }
 
-    public var body: some View {
+    var body: some View {
         let presentation = kind.presentation
 
         Image(systemName: presentation.symbolName)
@@ -155,20 +155,21 @@ public struct ClipboardKindBadge: View {
                 in: RoundedRectangle(cornerRadius: size * 0.28)
             )
             .accessibilityElement(children: .ignore)
-            .accessibilityLabel(kind.rawValue)
+            .accessibilityLabel(kind.localizedDisplayName)
+            .help(kind.localizedDisplayName)
     }
 }
 
-public struct SourceApplicationLabel: View {
+struct SourceApplicationLabel: View {
     private let name: String
     private let icon: NSImage?
 
-    public init(name: String, icon: NSImage?) {
+    init(name: String, icon: NSImage?) {
         self.name = name
         self.icon = icon
     }
 
-    public var body: some View {
+    var body: some View {
         HStack(spacing: 6) {
             Group {
                 if let icon {
@@ -192,22 +193,23 @@ public struct SourceApplicationLabel: View {
     }
 }
 
-public struct MetadataCard: View {
+struct MetadataCard: View {
     private let icon: String
     private let title: String
     private let value: String
 
-    public init(icon: String, title: String, value: String) {
+    init(icon: String, title: String, value: String) {
         self.icon = icon
         self.title = title
         self.value = value
     }
 
-    public var body: some View {
+    var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             Image(systemName: icon)
                 .font(.callout.weight(.semibold))
                 .foregroundStyle(.secondary)
+                .accessibilityHidden(true)
 
             Text(title)
                 .font(.caption)
@@ -218,12 +220,13 @@ public struct MetadataCard: View {
                 .foregroundStyle(.primary)
                 .lineLimit(2)
         }
+        .accessibilityElement(children: .combine)
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(12)
         .background(.thinMaterial, in: RoundedRectangle(cornerRadius: ClipFlowVisualStyle.cardRadius))
         .overlay {
             RoundedRectangle(cornerRadius: ClipFlowVisualStyle.cardRadius)
-                .stroke(Color.white.opacity(ClipFlowVisualStyle.hairlineOpacity))
+                .stroke(ClipFlowVisualStyle.hairlineColor)
         }
     }
 }

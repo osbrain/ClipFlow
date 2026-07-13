@@ -52,4 +52,18 @@ public extension ClipboardKind {
             ClipboardKindPresentation(symbolName: "questionmark.square.dashed", accent: .gray)
         }
     }
+
+    var localizedDisplayName: String {
+        let key = switch self {
+        case .text: "kind.text"
+        case .richText: "kind.richText"
+        case .image: "kind.image"
+        case .file: "kind.file"
+        case .link: "kind.link"
+        case .mixed: "kind.mixed"
+        case .unknown: "kind.unknown"
+        }
+
+        return L10n.string(key)
+    }
 }

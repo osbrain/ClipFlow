@@ -4,49 +4,39 @@ import Testing
 
 @Suite("Clipboard kind presentation")
 struct ClipboardKindPresentationTests {
-    @Test("text uses the text symbol")
-    func textSymbol() {
-        #expect(ClipboardKind.text.presentation.symbolName == "text.alignleft")
+    @Test("each kind has a stable symbol and accent")
+    func presentations() {
+        let expected: [(ClipboardKind, ClipboardKindPresentation)] = [
+            (.text, ClipboardKindPresentation(symbolName: "text.alignleft", accent: .blue)),
+            (.richText, ClipboardKindPresentation(symbolName: "doc.richtext", accent: .indigo)),
+            (.image, ClipboardKindPresentation(symbolName: "photo", accent: .green)),
+            (.file, ClipboardKindPresentation(symbolName: "doc", accent: .orange)),
+            (.link, ClipboardKindPresentation(symbolName: "link", accent: .teal)),
+            (.mixed, ClipboardKindPresentation(symbolName: "square.stack.3d.up", accent: .pink)),
+            (.unknown, ClipboardKindPresentation(symbolName: "questionmark.square.dashed", accent: .gray))
+        ]
+
+        for (kind, presentation) in expected {
+            #expect(kind.presentation == presentation)
+        }
     }
 
-    @Test("rich text uses the rich text document symbol")
-    func richTextSymbol() {
-        #expect(ClipboardKind.richText.presentation.symbolName == "doc.richtext")
-    }
+    @Test("each kind has localized English and Simplified Chinese names")
+    func localizedDisplayNames() {
+        let expected: [(ClipboardKind, String, String, String)] = [
+            (.text, "kind.text", "Text", "文本"),
+            (.richText, "kind.richText", "Rich Text", "富文本"),
+            (.image, "kind.image", "Image", "图片"),
+            (.file, "kind.file", "File", "文件"),
+            (.link, "kind.link", "Link", "链接"),
+            (.mixed, "kind.mixed", "Mixed", "混合内容"),
+            (.unknown, "kind.unknown", "Unknown", "未知类型")
+        ]
 
-    @Test("image uses the photo symbol")
-    func imageSymbol() {
-        #expect(ClipboardKind.image.presentation.symbolName == "photo")
-    }
-
-    @Test("file uses the document symbol")
-    func fileSymbol() {
-        #expect(ClipboardKind.file.presentation.symbolName == "doc")
-    }
-
-    @Test("link uses the link symbol")
-    func linkSymbol() {
-        #expect(ClipboardKind.link.presentation.symbolName == "link")
-    }
-
-    @Test("image and text use distinct accents")
-    func imageAndTextAccentsDiffer() {
-        #expect(ClipboardKind.image.presentation.accent != ClipboardKind.text.presentation.accent)
-    }
-
-    @Test("mixed uses a stable presentation")
-    func mixedPresentation() {
-        #expect(ClipboardKind.mixed.presentation == ClipboardKindPresentation(
-            symbolName: "square.stack.3d.up",
-            accent: .pink
-        ))
-    }
-
-    @Test("unknown uses a stable presentation")
-    func unknownPresentation() {
-        #expect(ClipboardKind.unknown.presentation == ClipboardKindPresentation(
-            symbolName: "questionmark.square.dashed",
-            accent: .gray
-        ))
+        for (kind, key, english, simplifiedChinese) in expected {
+            #expect(kind.localizedDisplayName == L10n.string(key))
+            #expect(L10n.string(key, locale: "en") == english)
+            #expect(L10n.string(key, locale: "zh-Hans") == simplifiedChinese)
+        }
     }
 }

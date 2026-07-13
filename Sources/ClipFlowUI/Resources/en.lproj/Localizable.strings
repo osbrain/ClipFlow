@@ -11,6 +11,13 @@
 "filter.files" = "Files";
 "filter.links" = "Links";
 "filter.browserTabs" = "Browser Tabs";
+"kind.text" = "Text";
+"kind.richText" = "Rich Text";
+"kind.image" = "Image";
+"kind.file" = "File";
+"kind.link" = "Link";
+"kind.mixed" = "Mixed";
+"kind.unknown" = "Unknown";
 "detail.preview" = "Preview";
 "detail.paste" = "Paste";
 "detail.source" = "Source";
