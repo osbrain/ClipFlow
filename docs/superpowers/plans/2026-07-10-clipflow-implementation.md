@@ -50,7 +50,7 @@
 - Create: `Sources/ClipFlowApp/ClipFlowApp.swift`
 - Create: `Tests/ClipFlowCoreTests/ModelsTests.swift`
 
-- [ ] **Step 1: Write a failing identity test**
+- [x] **Step 1: Write a failing identity test**
 
 ```swift
 import XCTest
@@ -70,13 +70,13 @@ final class ModelsTests: XCTestCase {
 }
 ```
 
-- [ ] **Step 2: Run the test and verify RED**
+- [x] **Step 2: Run the test and verify RED**
 
 Run: `swift test --filter ModelsTests/testClipboardItemKeepsStableIdentity`
 
 Expected: compilation fails because `ClipFlowCore` and `ClipboardItem` do not exist.
 
-- [ ] **Step 3: Add the package and minimal model**
+- [x] **Step 3: Add the package and minimal model**
 
 ```swift
 // Package.swift
@@ -141,13 +141,13 @@ import SwiftUI
 }
 ```
 
-- [ ] **Step 4: Run all tests and verify GREEN**
+- [x] **Step 4: Run all tests and verify GREEN**
 
 Run: `swift test`
 
 Expected: `ModelsTests` passes with zero failures.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add Package.swift Sources Tests
