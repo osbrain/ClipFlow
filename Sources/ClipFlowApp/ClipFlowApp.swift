@@ -12,8 +12,7 @@ struct ClipFlowApp: App {
 
     var body: some Scene {
         Settings {
-            Text("ClipFlow Settings")
-                .frame(width: 420, height: 240)
+            EmptyView()
         }
     }
 }
@@ -24,16 +23,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var hotKeyController: GlobalHotKeyController?
     private var monitor: PasteboardMonitor?
     private var pasteService: AppPasteService?
+    private var statusItem: NSStatusItem?
+    private var settingsWindow: NSWindowController?
+    private var settingsModel: SettingsModel?
+    private let loginItemService = LoginItemService()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
 
         do {
             let support = try Self.applicationSupportDirectory()
-            let keyData = try KeychainKeyStore(
-                service: "local.clipflow.app",
-                account: "database-key"
-            ).loadOrCreate()
+            let settings = SettingsModel()
+            let keyData = try Self.databaseKey(applicationSupport: support)
             let database = try SQLCipherDatabase(
                 url: support.appendingPathComponent("ClipFlow.sqlite"),
                 key: keyData
@@ -45,7 +46,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             let repository = try ClipboardRepository(
                 database: database,
                 externalPayloadStore: externalStore,
-                externalThresholdBytes: 1_048_576
+                externalThresholdBytes: settings.externalPayloadThresholdMB * 1_048_576
             )
             let clipboard = SystemClipboard()
             let coordinator = PasteCoordinator(
@@ -56,14 +57,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             let pasteService = AppPasteService(
                 repository: repository,
                 coordinator: coordinator,
-                modeResolver: PasteModeResolver(defaultMode: .original, overrides: [:])
+                modeResolver: PasteModeResolver(
+                    defaultMode: PasteMode(rawValue: settings.defaultPasteMode) ?? .original,
+                    overrides: [:]
+                )
             )
             let model = AppModel(repository: repository, pasteService: pasteService)
             let panelController = FloatingPanelController(
-                rootView: AnyView(MainPanelView(model: model))
+                rootView: AnyView(ClipFlowRootView(model: model, settings: settings))
             )
             let hotKeyController = GlobalHotKeyController()
-            try? hotKeyController.register(shortcut: .commandShiftV) { [weak self] in
+            try? hotKeyController.register(shortcut: settings.shortcut) { [weak self] in
                 self?.togglePanel()
             }
 
@@ -89,8 +93,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             self.hotKeyController = hotKeyController
             self.monitor = monitor
             self.pasteService = pasteService
+            self.settingsModel = settings
+            createStatusItem()
             capturePasteTarget()
             panelController.show()
+            #if DEBUG
+            if ProcessInfo.processInfo.environment["CLIPFLOW_SHOW_SETTINGS"] == "1" {
+                showSettings()
+            }
+            #endif
         } catch {
             let alert = NSAlert()
             alert.alertStyle = .critical
@@ -106,6 +117,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             Task { await monitor.stop() }
         }
         hotKeyController?.unregister()
+    }
+
+    func applicationDidBecomeActive(_ notification: Notification) {
+        guard let settingsModel else { return }
+        Task { await settingsModel.refreshPermissions() }
     }
 
     private func togglePanel() {
@@ -134,6 +150,78 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
+    private func createStatusItem() {
+        guard settingsModel?.showStatusBarItem != false else { return }
+        let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
+        item.button?.image = NSImage(
+            systemSymbolName: "doc.on.clipboard",
+            accessibilityDescription: "ClipFlow"
+        )
+        let menu = NSMenu()
+        let showItem = NSMenuItem(
+            title: "Show ClipFlow",
+            action: #selector(showPanelFromMenu),
+            keyEquivalent: ""
+        )
+        showItem.target = self
+        menu.addItem(showItem)
+        let settingsItem = NSMenuItem(
+            title: "Settings…",
+            action: #selector(showSettings),
+            keyEquivalent: ","
+        )
+        settingsItem.target = self
+        menu.addItem(settingsItem)
+        menu.addItem(.separator())
+        let quitItem = NSMenuItem(
+            title: "Quit ClipFlow",
+            action: #selector(quitApplication),
+            keyEquivalent: "q"
+        )
+        quitItem.target = self
+        menu.addItem(quitItem)
+        item.menu = menu
+        statusItem = item
+    }
+
+    @objc private func showPanelFromMenu() {
+        if panelController?.window?.isVisible != true {
+            capturePasteTarget()
+            panelController?.show()
+        }
+    }
+
+    @objc private func showSettings() {
+        guard let settingsModel else { return }
+        if let settingsWindow {
+            settingsWindow.showWindow(nil)
+            settingsWindow.window?.makeKeyAndOrderFront(nil)
+            NSApp.activate(ignoringOtherApps: true)
+            return
+        }
+
+        let window = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 640, height: 470),
+            styleMask: [.titled, .closable, .miniaturizable],
+            backing: .buffered,
+            defer: false
+        )
+        window.title = "ClipFlow Settings"
+        window.isReleasedWhenClosed = false
+        window.center()
+        window.contentView = NSHostingView(
+            rootView: SettingsView(model: settingsModel, loginItemService: loginItemService)
+        )
+        let controller = NSWindowController(window: window)
+        settingsWindow = controller
+        controller.showWindow(nil)
+        NSApp.activate(ignoringOtherApps: true)
+    }
+
+    @objc private func quitApplication() {
+        NSApp.terminate(nil)
+    }
+
     private static func applicationSupportDirectory() throws -> URL {
         let base = try FileManager.default.url(
             for: .applicationSupportDirectory,
@@ -141,8 +229,34 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             appropriateFor: nil,
             create: true
         )
-        let directory = base.appendingPathComponent("ClipFlow", isDirectory: true)
+        #if DEBUG
+        let directoryName = "ClipFlow-Development"
+        #else
+        let directoryName = "ClipFlow"
+        #endif
+        let directory = base.appendingPathComponent(directoryName, isDirectory: true)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         return directory
+    }
+
+    private static func databaseKey(applicationSupport: URL) throws -> Data {
+        #if DEBUG
+        let keyURL = applicationSupport.appendingPathComponent("development-key", isDirectory: false)
+        if let data = try? Data(contentsOf: keyURL), data.count == 32 {
+            return data
+        }
+        let key = SymmetricKey(size: .bits256).withUnsafeBytes { Data($0) }
+        try key.write(to: keyURL, options: [.atomic, .completeFileProtectionUnlessOpen])
+        try FileManager.default.setAttributes(
+            [.posixPermissions: 0o600],
+            ofItemAtPath: keyURL.path
+        )
+        return key
+        #else
+        return try KeychainKeyStore(
+            service: "local.clipflow.app",
+            account: "database-key"
+        ).loadOrCreate()
+        #endif
     }
 }

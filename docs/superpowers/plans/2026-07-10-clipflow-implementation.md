@@ -559,7 +559,7 @@ git commit -m "feat: build ClipFlow history interface"
 - Create: `Sources/ClipFlowSystem/LocalLogger.swift`
 - Create: `Tests/ClipFlowAppTests/SettingsModelTests.swift`
 
-- [ ] **Step 1: Write failing settings persistence tests**
+- [x] **Step 1: Write failing settings persistence tests**
 
 ```swift
 func testInvalidExternalThresholdIsClampedAndPermissionStatusRefreshes() async {
@@ -575,17 +575,17 @@ func testInvalidExternalThresholdIsClampedAndPermissionStatusRefreshes() async {
 }
 ```
 
-- [ ] **Step 2: Verify RED**
+- [x] **Step 2: Verify RED**
 
 Run: `swift test --filter SettingsModelTests`
 
 Expected: compilation fails for settings APIs.
 
-- [ ] **Step 3: Implement settings and onboarding sections**
+- [x] **Step 3: Implement settings and onboarding sections**
 
 Persist shortcut, panel frame, retention, byte limits, menu bar visibility, external threshold, detail fields, per-app paste modes, browser enablement, update preference, and redacted debug logging. `SMAppService.mainApp` controls login launch. Permission buttons open exact System Settings URLs and refresh on app activation.
 
-- [ ] **Step 4: Verify GREEN and commit**
+- [x] **Step 4: Verify GREEN and commit**
 
 Run: `swift test`
 
