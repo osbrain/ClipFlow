@@ -1,0 +1,11 @@
+import SwiftUI
+
+enum ClipFlowVisualStyle {
+    static let cardRadius: CGFloat = 12
+    static let controlRadius: CGFloat = 9
+    static let hairlineOpacity = 0.16
+    static let selectedFillOpacity = 0.18
+    static let selectedBorderOpacity = 0.9
+    static let panelPadding: CGFloat = 12
+    static let sectionSpacing: CGFloat = 16
+}
