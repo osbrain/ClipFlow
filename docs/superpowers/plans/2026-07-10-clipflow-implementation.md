@@ -222,7 +222,7 @@ git commit -m "feat: normalize clipboard captures"
 - Create: `Tests/ClipFlowCoreTests/SearchQueryTests.swift`
 - Create: `Tests/ClipFlowCoreTests/RetentionPolicyTests.swift`
 
-- [ ] **Step 1: Write failing behavior tests**
+- [x] **Step 1: Write failing behavior tests**
 
 ```swift
 func testSearchMatchesTitleBeforeBodyAndFiltersFavorite() {
@@ -243,17 +243,17 @@ func testRetentionPreservesFavoritesAndRemovesOldestUntilWithinBudget() {
 }
 ```
 
-- [ ] **Step 2: Verify RED**
+- [x] **Step 2: Verify RED**
 
 Run: `swift test --filter 'SearchQueryTests|RetentionPolicyTests'`
 
 Expected: compilation fails for the missing search and retention types.
 
-- [ ] **Step 3: Implement deterministic token matching and cleanup ordering**
+- [x] **Step 3: Implement deterministic token matching and cleanup ordering**
 
 Use case- and diacritic-insensitive normalized tokens. Return ranking values where exact title, title prefix, title contains, body contains, and app contains are increasingly larger. Retention first removes expired non-favorites, then the oldest non-favorites until both count and byte constraints are satisfied.
 
-- [ ] **Step 4: Verify GREEN and commit**
+- [x] **Step 4: Verify GREEN and commit**
 
 Run: `swift test`
 
