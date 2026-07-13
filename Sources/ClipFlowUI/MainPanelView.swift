@@ -35,6 +35,7 @@ public struct MainPanelView: View {
                     DetailView(
                         item: model.selectedItem,
                         paste: { Task { await model.pasteSelection() } },
+                        preview: { model.previewSelection() },
                         favorite: { Task { await model.toggleFavoriteSelection() } },
                         rename: {
                             renameText = model.selectedItem?.customTitle
@@ -42,7 +43,11 @@ public struct MainPanelView: View {
                                 ?? ""
                             showingRename = true
                         },
-                        delete: { showingDeleteConfirmation = true }
+                        delete: { showingDeleteConfirmation = true },
+                        applicationActions: model.availableApplicationActions,
+                        performApplicationAction: { action in
+                            Task { await model.performApplicationAction(action) }
+                        }
                     )
                     .frame(minWidth: 300, maxWidth: .infinity)
                 }
@@ -280,8 +285,25 @@ private struct HistoryListView: View {
             List(model.items, selection: $model.selectedItemID) { item in
                 HistoryRow(item: item)
                     .tag(item.id)
+                    .onDrag {
+                        model.dragProvider(for: item)
+                            ?? NSItemProvider(object: item.previewText as NSString)
+                    }
                     .contextMenu {
-                        Button("Paste") { Task { await model.pasteSelection() } }
+                        Button("Paste") {
+                            model.selectedItemID = item.id
+                            Task { await model.pasteSelection() }
+                        }
+                        Button("Quick Look") {
+                            model.selectedItemID = item.id
+                            model.previewSelection()
+                        }
+                        ForEach(model.applicationActions(for: item), id: \.self) { action in
+                            Button(action.displayName) {
+                                model.selectedItemID = item.id
+                                Task { await model.performApplicationAction(action) }
+                            }
+                        }
                         Button(item.isFavorite ? "Remove Favorite" : "Favorite") {
                             model.selectedItemID = item.id
                             Task { await model.toggleFavoriteSelection() }
@@ -347,7 +369,7 @@ private extension ClipboardKind {
     var symbolName: String {
         switch self {
         case .text: "text.alignleft"
-        case .richText: "textformat"
+        case .richText: "doc.richtext"
         case .image: "photo"
         case .file: "doc"
         case .link: "link"

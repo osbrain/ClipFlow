@@ -23,6 +23,14 @@ public protocol PasteServing: Sendable {
 }
 
 @MainActor
+public protocol ItemIntegrationServing: AnyObject {
+    func availableActions(for item: ClipboardItem) -> [ApplicationAction]
+    func preview(_ item: ClipboardItem) throws
+    func dragProvider(for item: ClipboardItem) -> NSItemProvider?
+    func perform(_ action: ApplicationAction, for item: ClipboardItem) async throws
+}
+
+@MainActor
 @Observable
 public final class AppModel {
     public var searchText = ""
@@ -38,15 +46,54 @@ public final class AppModel {
 
     @ObservationIgnored private let repository: any HistoryRepository
     @ObservationIgnored private let pasteService: any PasteServing
+    @ObservationIgnored private let itemIntegrations: (any ItemIntegrationServing)?
 
-    public init(repository: any HistoryRepository, pasteService: any PasteServing) {
+    public init(
+        repository: any HistoryRepository,
+        pasteService: any PasteServing,
+        itemIntegrations: (any ItemIntegrationServing)? = nil
+    ) {
         self.repository = repository
         self.pasteService = pasteService
+        self.itemIntegrations = itemIntegrations
     }
 
     public var selectedItem: ClipboardItem? {
         guard let selectedItemID else { return nil }
         return items.first { $0.id == selectedItemID }
+    }
+
+    public var availableApplicationActions: [ApplicationAction] {
+        guard let selectedItem, let itemIntegrations else { return [] }
+        return itemIntegrations.availableActions(for: selectedItem)
+    }
+
+    public func applicationActions(for item: ClipboardItem) -> [ApplicationAction] {
+        itemIntegrations?.availableActions(for: item) ?? []
+    }
+
+    public func previewSelection() {
+        guard let selectedItem, let itemIntegrations else { return }
+        do {
+            try itemIntegrations.preview(selectedItem)
+            errorMessage = nil
+        } catch {
+            errorMessage = "Unable to preview the selected item: \(error.localizedDescription)"
+        }
+    }
+
+    public func dragProvider(for item: ClipboardItem) -> NSItemProvider? {
+        itemIntegrations?.dragProvider(for: item)
+    }
+
+    public func performApplicationAction(_ action: ApplicationAction) async {
+        guard let selectedItem, let itemIntegrations else { return }
+        do {
+            try await itemIntegrations.perform(action, for: selectedItem)
+            errorMessage = nil
+        } catch {
+            errorMessage = "Unable to complete \(action.displayName): \(error.localizedDescription)"
+        }
     }
 
     public func reload() async {

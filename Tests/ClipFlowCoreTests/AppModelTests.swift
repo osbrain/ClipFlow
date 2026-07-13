@@ -88,6 +88,28 @@ struct AppModelTests {
         #expect(repository.deletedCategoryIDs == [category!.id])
     }
 
+    @Test("routes preview and optional application actions for the selection")
+    func routesSelectionIntegrations() async {
+        let item = Self.item(preview: "Send this")
+        let repository = FakeHistoryRepository(items: [item])
+        let integrations = FakeItemIntegrationService()
+        let model = AppModel(
+            repository: repository,
+            pasteService: FakePasteService(),
+            itemIntegrations: integrations
+        )
+        await model.reload()
+
+        #expect(model.availableApplicationActions == [.openFeishu])
+        model.previewSelection()
+        await model.performApplicationAction(.openFeishu)
+
+        #expect(integrations.previewedIDs == [item.id])
+        #expect(integrations.performedActions.count == 1)
+        #expect(integrations.performedActions.first?.0 == .openFeishu)
+        #expect(integrations.performedActions.first?.1 == item.id)
+    }
+
     private static func item(preview: String) -> ClipboardItem {
         ClipboardItem(
             id: UUID(), createdAt: .distantPast, updatedAt: .distantPast,
@@ -181,5 +203,27 @@ private actor FakePasteService: PasteServing {
     func paste(item: ClipboardItem) async throws -> PasteOutcome {
         pastedIDs.append(item.id)
         return .pasted
+    }
+}
+
+@MainActor
+private final class FakeItemIntegrationService: ItemIntegrationServing {
+    private(set) var previewedIDs: [UUID] = []
+    private(set) var performedActions: [(ApplicationAction, UUID)] = []
+
+    func availableActions(for item: ClipboardItem) -> [ApplicationAction] {
+        [.openFeishu]
+    }
+
+    func preview(_ item: ClipboardItem) throws {
+        previewedIDs.append(item.id)
+    }
+
+    func dragProvider(for item: ClipboardItem) -> NSItemProvider? {
+        nil
+    }
+
+    func perform(_ action: ApplicationAction, for item: ClipboardItem) async throws {
+        performedActions.append((action, item.id))
     }
 }

@@ -32,6 +32,8 @@ public final class SettingsModel {
     public var maximumStorageMB: Int
     public var externalPayloadThresholdMB: Int
     public var browserTabManagementEnabled: Bool
+    public var feishuActionEnabled: Bool
+    public var doubaoActionEnabled: Bool
     public var autoCheckUpdatesEnabled: Bool
     public var debugLoggingEnabled: Bool
     public var defaultPasteMode: String
@@ -64,6 +66,8 @@ public final class SettingsModel {
         if store.integer(forKey: "maximumStorageMB") == 0 { maximumStorageMB = 2_048 }
         externalPayloadThresholdMB = max(1, store.integer(forKey: "externalPayloadThresholdMB"))
         browserTabManagementEnabled = store.bool(forKey: "browserTabManagementEnabled")
+        feishuActionEnabled = store.bool(forKey: "feishuActionEnabled")
+        doubaoActionEnabled = store.bool(forKey: "doubaoActionEnabled")
         autoCheckUpdatesEnabled = store.string(forKey: "autoCheckUpdatesEnabled") == nil
             ? true : store.bool(forKey: "autoCheckUpdatesEnabled")
         debugLoggingEnabled = store.bool(forKey: "debugLoggingEnabled")
@@ -92,6 +96,8 @@ public final class SettingsModel {
         store.set(maximumStorageMB, forKey: "maximumStorageMB")
         store.set(externalPayloadThresholdMB, forKey: "externalPayloadThresholdMB")
         store.set(browserTabManagementEnabled, forKey: "browserTabManagementEnabled")
+        store.set(feishuActionEnabled, forKey: "feishuActionEnabled")
+        store.set(doubaoActionEnabled, forKey: "doubaoActionEnabled")
         store.set(autoCheckUpdatesEnabled, forKey: "autoCheckUpdatesEnabled")
         store.set(debugLoggingEnabled, forKey: "debugLoggingEnabled")
         store.set(defaultPasteMode, forKey: "defaultPasteMode")

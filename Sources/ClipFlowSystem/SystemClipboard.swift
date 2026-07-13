@@ -2,7 +2,8 @@ import AppKit
 import ClipFlowCore
 import Foundation
 
-public final class SystemClipboard: PasteboardAccess, ClipboardWriting, @unchecked Sendable {
+public final class SystemClipboard: PasteboardAccess, ClipboardWriting,
+    ApplicationActionClipboard, @unchecked Sendable {
     private let pasteboard: NSPasteboard
 
     public init(pasteboard: NSPasteboard = .general) {
@@ -31,6 +32,28 @@ public final class SystemClipboard: PasteboardAccess, ClipboardWriting, @uncheck
             sourceBundleID: sourceApplication?.bundleIdentifier,
             items: items
         )
+    }
+
+    public func captureActionSnapshot() throws -> ClipboardSnapshot {
+        let payloads = (pasteboard.pasteboardItems ?? []).enumerated().flatMap { itemIndex, item in
+            item.types.compactMap { type -> NormalizedPayload? in
+                guard let data = item.data(forType: type) else { return nil }
+                return NormalizedPayload(itemIndex: itemIndex, type: type.rawValue, data: data)
+            }
+        }
+        return ClipboardSnapshot(payloads: payloads)
+    }
+
+    public func write(_ payloads: [NormalizedPayload]) throws {
+        _ = try write(payloads: payloads, mode: .original)
+    }
+
+    public func restore(_ snapshot: ClipboardSnapshot) throws {
+        if snapshot.payloads.isEmpty {
+            pasteboard.clearContents()
+        } else {
+            _ = try write(payloads: snapshot.payloads, mode: .original)
+        }
     }
 
     @discardableResult

@@ -1,12 +1,16 @@
 import ClipFlowCore
+import ClipFlowSystem
 import SwiftUI
 
 struct DetailView: View {
     let item: ClipboardItem?
     let paste: () -> Void
+    let preview: () -> Void
     let favorite: () -> Void
     let rename: () -> Void
     let delete: () -> Void
+    let applicationActions: [ApplicationAction]
+    let performApplicationAction: (ApplicationAction) -> Void
 
     var body: some View {
         Group {
@@ -23,6 +27,10 @@ struct DetailView: View {
                         }
                         Spacer()
                         HStack(spacing: 6) {
+                            Button(action: preview) {
+                                Image(systemName: "eye")
+                            }
+                            .help("Quick Look")
                             Button(action: favorite) {
                                 Image(systemName: item.isFavorite ? "star.fill" : "star")
                             }
@@ -51,6 +59,22 @@ struct DetailView: View {
                             .textSelection(.enabled)
                             .frame(maxWidth: .infinity, alignment: .topLeading)
                             .padding(18)
+                    }
+
+                    if !applicationActions.isEmpty {
+                        Divider()
+                        HStack(spacing: 8) {
+                            ForEach(applicationActions, id: \.self) { action in
+                                Button {
+                                    performApplicationAction(action)
+                                } label: {
+                                    Label(action.displayName, systemImage: action.symbolName)
+                                }
+                            }
+                            Spacer()
+                        }
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 10)
                     }
 
                     Divider()

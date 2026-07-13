@@ -5,14 +5,23 @@ import SwiftUI
 public struct SettingsView: View {
     @Bindable private var model: SettingsModel
     private let loginItemService: LoginItemService
+    @State private var selectedTab: SettingsTab
 
     public init(model: SettingsModel, loginItemService: LoginItemService) {
         self.model = model
         self.loginItemService = loginItemService
+        #if DEBUG
+        let initialTab = SettingsTab(
+            rawValue: ProcessInfo.processInfo.environment["CLIPFLOW_SETTINGS_TAB"] ?? ""
+        ) ?? .general
+        #else
+        let initialTab = SettingsTab.general
+        #endif
+        _selectedTab = State(initialValue: initialTab)
     }
 
     public var body: some View {
-        TabView {
+        TabView(selection: $selectedTab) {
             Form {
                 Picker("Global shortcut", selection: $model.shortcut) {
                     Text("Command-Shift-V").tag(HotKeyShortcut.commandShiftV)
@@ -32,6 +41,7 @@ public struct SettingsView: View {
             }
             .formStyle(.grouped)
             .tabItem { Label("General", systemImage: "gearshape") }
+            .tag(SettingsTab.general)
 
             Form {
                 Picker("Keep history", selection: $model.retentionPolicy) {
@@ -50,6 +60,7 @@ public struct SettingsView: View {
             }
             .formStyle(.grouped)
             .tabItem { Label("Storage", systemImage: "externaldrive") }
+            .tag(SettingsTab.storage)
 
             Form {
                 LabeledContent("Accessibility") {
@@ -60,10 +71,13 @@ public struct SettingsView: View {
                     }
                 }
                 Toggle("Browser tab management", isOn: $model.browserTabManagementEnabled)
+                Toggle("Send to Feishu action", isOn: $model.feishuActionEnabled)
+                Toggle("Ask Doubao action", isOn: $model.doubaoActionEnabled)
                 Toggle("Check for updates automatically", isOn: $model.autoCheckUpdatesEnabled)
             }
             .formStyle(.grouped)
             .tabItem { Label("Permissions", systemImage: "hand.raised") }
+            .tag(SettingsTab.permissions)
 
             Form {
                 Toggle("Show source application", isOn: $model.showDetailSource)
@@ -74,6 +88,7 @@ public struct SettingsView: View {
             }
             .formStyle(.grouped)
             .tabItem { Label("Details", systemImage: "list.bullet.rectangle") }
+            .tag(SettingsTab.details)
         }
         .frame(width: 620, height: 430)
         .padding(12)
@@ -91,6 +106,8 @@ public struct SettingsView: View {
             maximumStorageMB: model.maximumStorageMB,
             externalPayloadThresholdMB: model.externalPayloadThresholdMB,
             browserTabManagementEnabled: model.browserTabManagementEnabled,
+            feishuActionEnabled: model.feishuActionEnabled,
+            doubaoActionEnabled: model.doubaoActionEnabled,
             autoCheckUpdatesEnabled: model.autoCheckUpdatesEnabled,
             debugLoggingEnabled: model.debugLoggingEnabled,
             defaultPasteMode: model.defaultPasteMode,
@@ -109,6 +126,13 @@ public struct SettingsView: View {
     }
 }
 
+private enum SettingsTab: String, Hashable {
+    case general
+    case storage
+    case permissions
+    case details
+}
+
 private struct SettingsSnapshot: Equatable {
     let shortcut: HotKeyShortcut
     let launchAtLogin: Bool
@@ -118,9 +142,10 @@ private struct SettingsSnapshot: Equatable {
     let maximumStorageMB: Int
     let externalPayloadThresholdMB: Int
     let browserTabManagementEnabled: Bool
+    let feishuActionEnabled: Bool
+    let doubaoActionEnabled: Bool
     let autoCheckUpdatesEnabled: Bool
     let debugLoggingEnabled: Bool
     let defaultPasteMode: String
     let detailFlags: [Bool]
 }
-

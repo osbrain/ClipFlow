@@ -48,6 +48,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 externalPayloadStore: externalStore,
                 externalThresholdBytes: settings.externalPayloadThresholdMB * 1_048_576
             )
+            #if DEBUG
+            if ProcessInfo.processInfo.environment["CLIPFLOW_SEED_DEMO"] == "1" {
+                let capture = RawClipboardCapture(
+                    sourceAppName: "Notes",
+                    sourceBundleID: "com.apple.Notes",
+                    items: [RawClipboardItem(representations: [
+                        RawClipboardRepresentation(
+                            type: "public.utf8-plain-text",
+                            data: Data("ClipFlow preview and drag acceptance item".utf8)
+                        )
+                    ])]
+                )
+                _ = try repository.upsert(
+                    ClipboardNormalizer(
+                        maxRepresentationBytes: 1_024 * 1_024,
+                        maxCaptureBytes: 1_024 * 1_024
+                    ).normalize(capture)
+                )
+            }
+            #endif
             let clipboard = SystemClipboard()
             let coordinator = PasteCoordinator(
                 writer: clipboard,
@@ -62,7 +82,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     overrides: [:]
                 )
             )
-            let model = AppModel(repository: repository, pasteService: pasteService)
+            let itemIntegrations = AppItemIntegrationService(
+                repository: repository,
+                settings: settings,
+                clipboard: clipboard
+            )
+            let model = AppModel(
+                repository: repository,
+                pasteService: pasteService,
+                itemIntegrations: itemIntegrations
+            )
             let browserModel = BrowserTabModel(service: BrowserAutomation())
             #if DEBUG
             if ProcessInfo.processInfo.environment["CLIPFLOW_SHOW_BROWSER_TABS"] == "1" {
@@ -110,6 +139,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             capturePasteTarget()
             panelController.show()
             #if DEBUG
+            if ProcessInfo.processInfo.environment["CLIPFLOW_SHOW_PREVIEW"] == "1" {
+                Task {
+                    await model.reload()
+                    model.previewSelection()
+                }
+            }
             if ProcessInfo.processInfo.environment["CLIPFLOW_SHOW_SETTINGS"] == "1" {
                 showSettings()
             }
@@ -235,6 +270,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private static func applicationSupportDirectory() throws -> URL {
+        #if DEBUG
+        if let override = ProcessInfo.processInfo.environment["CLIPFLOW_DEVELOPMENT_DATA_DIR"],
+           !override.isEmpty {
+            let directory = URL(fileURLWithPath: override, isDirectory: true)
+            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+            return directory
+        }
+        #endif
         let base = try FileManager.default.url(
             for: .applicationSupportDirectory,
             in: .userDomainMask,

@@ -647,7 +647,7 @@ git commit -m "feat: search and activate browser tabs"
 - Create: `Sources/ClipFlowSystem/ApplicationActions.swift`
 - Create: `Tests/ClipFlowSystemTests/ApplicationActionsTests.swift`
 
-- [ ] **Step 1: Write failing action availability tests**
+- [x] **Step 1: Write failing action availability tests**
 
 ```swift
 func testActionRequiresInstalledTargetAndCompatiblePayload() {
@@ -658,17 +658,17 @@ func testActionRequiresInstalledTargetAndCompatiblePayload() {
 }
 ```
 
-- [ ] **Step 2: Verify RED**
+- [x] **Step 2: Verify RED**
 
 Run: `swift test --filter ApplicationActionsTests`
 
 Expected: compilation fails for application actions.
 
-- [ ] **Step 3: Implement previews, draggable representations, and guarded actions**
+- [x] **Step 3: Implement previews, draggable representations, and guarded actions**
 
 Quick Look uses temporary decrypted copies deleted after preview. Drag-out supplies original file URLs or promised temporary files. Feishu and Doubao actions appear only when their bundle IDs are installed, the payload is compatible, and the user enabled the action; failures restore the original pasteboard.
 
-- [ ] **Step 4: Verify GREEN and commit**
+- [x] **Step 4: Verify GREEN and commit**
 
 Run: `swift test`
 
