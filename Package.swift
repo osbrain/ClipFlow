@@ -14,7 +14,21 @@ let package = Package(
     ],
     targets: [
         .target(name: "ClipFlowCore"),
-        .target(name: "ClipFlowStorage", dependencies: ["ClipFlowCore"]),
+        .systemLibrary(
+            name: "CSQLCipher",
+            path: "Sources/CSQLCipher"
+        ),
+        .target(
+            name: "ClipFlowStorage",
+            dependencies: ["ClipFlowCore", "CSQLCipher"],
+            linkerSettings: [
+                .unsafeFlags([
+                    "-L", ".build-tools/sqlcipher/static-lib",
+                    "-L", ".build-tools/openssl/lib",
+                    "-lcrypto", "-lz"
+                ])
+            ]
+        ),
         .target(name: "ClipFlowSystem", dependencies: ["ClipFlowCore"]),
         .executableTarget(name: "ClipFlowApp", dependencies: ["ClipFlowCore"]),
         .executableTarget(

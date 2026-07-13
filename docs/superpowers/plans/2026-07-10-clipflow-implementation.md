@@ -319,7 +319,7 @@ git commit -m "feat: encrypt external clipboard payloads"
 - Create: `Sources/ClipFlowStorage/ClipboardRepository.swift`
 - Create: `Tests/ClipFlowStorageTests/ClipboardRepositoryTests.swift`
 
-- [ ] **Step 1: Write failing repository integration tests**
+- [x] **Step 1: Write failing repository integration tests**
 
 ```swift
 func testInsertDeduplicatesByHashAndSearchesUpdatedItem() throws {
@@ -340,7 +340,7 @@ func testCategoryDeletionDoesNotDeleteClipboardItem() throws {
 }
 ```
 
-- [ ] **Step 2: Verify RED**
+- [x] **Step 2: Verify RED**
 
 Run: `swift test --filter ClipboardRepositoryTests`
 
@@ -350,11 +350,11 @@ Expected: compilation fails for the database and repository APIs.
 
 Pin SQLCipher to a reviewed release in `Vendor/sqlcipher`, compile it through a C target with `SQLITE_HAS_CODEC`, `SQLITE_ENABLE_FTS5`, `SQLITE_ENABLE_JSON1`, and `SQLITE_THREADSAFE=2`, and expose only `sqlite3.h` through `CSQLCipher`. Record the upstream version and checksum in `Vendor/sqlcipher/README.md`.
 
-- [ ] **Step 4: Implement database and schema**
+- [x] **Step 4: Implement database and schema**
 
 Open with `sqlite3_open_v2`, call `sqlite3_key` before any query, enable foreign keys and WAL, then run `PRAGMA cipher_integrity_check`. Migrations create the tables and indexes defined in the product design plus FTS5 triggers for `custom_title`, `preview_text`, `search_text`, and `app_name`.
 
-- [ ] **Step 5: Implement transactional repository behavior**
+- [x] **Step 5: Implement transactional repository behavior**
 
 `upsert` must update an existing content hash, insert all payloads atomically, move large payloads through `ExternalPayloadStore`, and delete newly written files if the transaction rolls back. Category, favorite, rename, delete, search, count/bytes, cleanup, export, and backup methods use prepared statements and typed row decoding.
 

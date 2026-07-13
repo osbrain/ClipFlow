@@ -66,3 +66,16 @@ public struct ClipboardItem: Identifiable, Codable, Equatable, Sendable {
     }
 }
 
+public struct ClipCategory: Identifiable, Codable, Equatable, Sendable {
+    public let id: UUID
+    public let name: String
+    public let createdAt: Date
+    public let sortOrder: Int
+
+    public init(id: UUID, name: String, createdAt: Date, sortOrder: Int) {
+        self.id = id
+        self.name = name
+        self.createdAt = createdAt
+        self.sortOrder = sortOrder
+    }
+}
