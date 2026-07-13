@@ -87,10 +87,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 settings: settings,
                 clipboard: clipboard
             )
+            let visualService = AppClipboardVisualService(repository: repository)
             let model = AppModel(
                 repository: repository,
                 pasteService: pasteService,
-                itemIntegrations: itemIntegrations
+                itemIntegrations: itemIntegrations,
+                visualService: visualService
             )
             let browserModel = BrowserTabModel(service: BrowserAutomation())
             #if DEBUG

@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import Testing
 import ClipFlowCore
@@ -110,9 +111,80 @@ struct AppModelTests {
         #expect(integrations.performedActions.first?.1 == item.id)
     }
 
-    private static func item(preview: String) -> ClipboardItem {
+    @Test("reload publishes metadata visuals without loading thumbnails")
+    func reloadPublishesMetadataVisuals() async throws {
+        let item = Self.item(preview: "Visual")
+        let repository = FakeHistoryRepository(items: [item])
+        let visualService = FakeClipboardVisualService()
+        let model = AppModel(
+            repository: repository,
+            pasteService: FakePasteService(),
+            visualService: visualService
+        )
+
+        await model.reload()
+
+        let visual = try #require(model.visuals[item.id])
+        #expect(visual.itemID == item.id)
+        #expect(visual.kind == item.kind.presentation)
+        #expect(visual.thumbnail == nil)
+        #expect(visualService.metadataItemIDs == [item.id])
+        #expect(visualService.requestedItems.isEmpty)
+    }
+
+    @Test("removed items discard thumbnails that finish after reload")
+    func removedItemsDiscardLateThumbnails() async {
+        let item = Self.item(preview: "Remove")
+        let repository = FakeHistoryRepository(items: [item])
+        let visualService = FakeClipboardVisualService()
+        let model = AppModel(
+            repository: repository,
+            pasteService: FakePasteService(),
+            visualService: visualService
+        )
+        await model.reload()
+
+        model.requestThumbnail(for: item, maximumPixelSize: 64)
+        await visualService.waitForRequestCount(1)
+        repository.replaceItems(with: [])
+        await model.reload()
+        await visualService.completeRequest(at: 0, with: Self.image(width: 11))
+
+        #expect(model.visuals[item.id] == nil)
+    }
+
+    @Test("replaced content discards its old thumbnail and accepts the current result")
+    func replacedContentMatchesThumbnailByIdentityAndHash() async throws {
+        let itemID = UUID()
+        let original = Self.item(id: itemID, preview: "Original")
+        let replacement = Self.item(id: itemID, preview: "Replacement")
+        let repository = FakeHistoryRepository(items: [original])
+        let visualService = FakeClipboardVisualService()
+        let model = AppModel(
+            repository: repository,
+            pasteService: FakePasteService(),
+            visualService: visualService
+        )
+        await model.reload()
+
+        model.requestThumbnail(for: original, maximumPixelSize: 64)
+        await visualService.waitForRequestCount(1)
+        repository.replaceItems(with: [replacement])
+        await model.reload()
+        await visualService.completeRequest(at: 0, with: Self.image(width: 13))
+        #expect(model.visuals[itemID]?.thumbnail == nil)
+
+        model.requestThumbnail(for: replacement, maximumPixelSize: 64)
+        await visualService.waitForRequestCount(2)
+        await visualService.completeRequest(at: 1, with: Self.image(width: 29))
+
+        let thumbnail = try #require(model.visuals[itemID]?.thumbnail)
+        #expect(thumbnail.size.width == 29)
+    }
+
+    private static func item(id: UUID = UUID(), preview: String) -> ClipboardItem {
         ClipboardItem(
-            id: UUID(), createdAt: .distantPast, updatedAt: .distantPast,
+            id: id, createdAt: .distantPast, updatedAt: .distantPast,
             appName: "Notes", bundleID: "com.apple.Notes", kind: .text,
             previewText: preview, searchText: preview.lowercased(),
             byteSize: preview.utf8.count, contentHash: preview,
@@ -120,11 +192,15 @@ struct AppModelTests {
             hasExternalPayload: false
         )
     }
+
+    private static func image(width: CGFloat) -> NSImage {
+        NSImage(size: NSSize(width: width, height: 1))
+    }
 }
 
 private final class FakeHistoryRepository: HistoryRepository, @unchecked Sendable {
     private let lock = NSLock()
-    private let items: [ClipboardItem]
+    private var items: [ClipboardItem]
     private var used: [UUID] = []
     private var query: SearchQuery?
     private var favorites: [(UUID, Bool)] = []
@@ -144,13 +220,19 @@ private final class FakeHistoryRepository: HistoryRepository, @unchecked Sendabl
     var assignments: [(UUID, UUID)] { lock.withLock { storedAssignments } }
     var deletedCategoryIDs: [UUID] { lock.withLock { categoryDeletions } }
 
+    func replaceItems(with items: [ClipboardItem]) {
+        lock.withLock { self.items = items }
+    }
+
     func search(_ query: SearchQuery) throws -> [ClipboardItem] {
         lock.withLock { self.query = query }
-        return items.filter {
-            query.score(ItemSearchDocument(
-                id: $0.id, title: $0.displayTitle, body: $0.searchText,
-                appName: $0.appName, isFavorite: $0.isFavorite, kind: $0.kind
-            )) != nil
+        return lock.withLock {
+            items.filter {
+                query.score(ItemSearchDocument(
+                    id: $0.id, title: $0.displayTitle, body: $0.searchText,
+                    appName: $0.appName, isFavorite: $0.isFavorite, kind: $0.kind
+                )) != nil
+            }
         }
     }
 
@@ -225,5 +307,45 @@ private final class FakeItemIntegrationService: ItemIntegrationServing {
 
     func perform(_ action: ApplicationAction, for item: ClipboardItem) async throws {
         performedActions.append((action, item.id))
+    }
+}
+
+@MainActor
+private final class FakeClipboardVisualService: ClipboardVisualServing {
+    private struct PendingRequest {
+        let continuation: CheckedContinuation<NSImage?, Never>
+    }
+
+    private(set) var metadataItemIDs: [UUID] = []
+    private(set) var requestedItems: [ClipboardItem] = []
+    private var pendingRequests: [Int: PendingRequest] = [:]
+
+    func metadataVisual(for item: ClipboardItem) -> ClipboardVisualDescriptor {
+        metadataItemIDs.append(item.id)
+        return ClipboardVisualDescriptor(
+            itemID: item.id,
+            applicationIcon: nil,
+            thumbnail: nil,
+            kind: item.kind.presentation
+        )
+    }
+
+    func loadThumbnail(for item: ClipboardItem, maximumPixelSize: Int) async -> NSImage? {
+        let index = requestedItems.count
+        requestedItems.append(item)
+        return await withCheckedContinuation { continuation in
+            pendingRequests[index] = PendingRequest(continuation: continuation)
+        }
+    }
+
+    func waitForRequestCount(_ expectedCount: Int) async {
+        while requestedItems.count < expectedCount {
+            await Task.yield()
+        }
+    }
+
+    func completeRequest(at index: Int, with image: NSImage?) async {
+        pendingRequests.removeValue(forKey: index)?.continuation.resume(returning: image)
+        await Task.yield()
     }
 }

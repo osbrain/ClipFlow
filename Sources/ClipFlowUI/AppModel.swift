@@ -43,19 +43,25 @@ public final class AppModel {
     public private(set) var isLoading = false
     public private(set) var errorMessage: String?
     public private(set) var lastPasteOutcome: PasteOutcome?
+    public private(set) var visuals: [UUID: ClipboardVisualDescriptor] = [:]
 
     @ObservationIgnored private let repository: any HistoryRepository
     @ObservationIgnored private let pasteService: any PasteServing
     @ObservationIgnored private let itemIntegrations: (any ItemIntegrationServing)?
+    @ObservationIgnored private let visualService: (any ClipboardVisualServing)?
+    @ObservationIgnored private var thumbnailTasks: [UUID: Task<Void, Never>] = [:]
+    @ObservationIgnored private var thumbnailRequestIDs: [UUID: UUID] = [:]
 
     public init(
         repository: any HistoryRepository,
         pasteService: any PasteServing,
-        itemIntegrations: (any ItemIntegrationServing)? = nil
+        itemIntegrations: (any ItemIntegrationServing)? = nil,
+        visualService: (any ClipboardVisualServing)? = nil
     ) {
         self.repository = repository
         self.pasteService = pasteService
         self.itemIntegrations = itemIntegrations
+        self.visualService = visualService
     }
 
     public var selectedItem: ClipboardItem? {
@@ -110,6 +116,16 @@ public final class AppModel {
             let results = try repository.search(query)
             categories = try repository.allCategories()
             items = results
+            thumbnailTasks.values.forEach { $0.cancel() }
+            thumbnailTasks.removeAll()
+            thumbnailRequestIDs.removeAll()
+            if let visualService {
+                visuals = Dictionary(uniqueKeysWithValues: results.map {
+                    ($0.id, visualService.metadataVisual(for: $0))
+                })
+            } else {
+                visuals.removeAll()
+            }
             if let selectedItemID, results.contains(where: { $0.id == selectedItemID }) {
                 self.selectedItemID = selectedItemID
             } else {
@@ -118,6 +134,43 @@ public final class AppModel {
             errorMessage = nil
         } catch {
             errorMessage = "Unable to load clipboard history: \(error.localizedDescription)"
+        }
+    }
+
+    public func requestThumbnail(for item: ClipboardItem, maximumPixelSize: Int) {
+        guard maximumPixelSize > 0,
+              let visualService,
+              visuals[item.id] != nil,
+              items.contains(where: {
+                  $0.id == item.id && $0.contentHash == item.contentHash
+              }) else {
+            return
+        }
+
+        thumbnailTasks[item.id]?.cancel()
+        let requestID = UUID()
+        thumbnailRequestIDs[item.id] = requestID
+        thumbnailTasks[item.id] = Task { @MainActor [weak self] in
+            let thumbnail = await visualService.loadThumbnail(
+                for: item,
+                maximumPixelSize: maximumPixelSize
+            )
+            guard let self else { return }
+            defer {
+                if self.thumbnailRequestIDs[item.id] == requestID {
+                    self.thumbnailTasks[item.id] = nil
+                    self.thumbnailRequestIDs[item.id] = nil
+                }
+            }
+            guard !Task.isCancelled,
+                  self.thumbnailRequestIDs[item.id] == requestID,
+                  self.items.contains(where: {
+                      $0.id == item.id && $0.contentHash == item.contentHash
+                  }),
+                  let descriptor = self.visuals[item.id] else {
+                return
+            }
+            self.visuals[item.id] = descriptor.replacingThumbnail(thumbnail)
         }
     }
 
