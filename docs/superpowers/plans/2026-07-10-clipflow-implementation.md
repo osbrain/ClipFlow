@@ -378,7 +378,7 @@ git commit -m "feat: add encrypted clipboard repository"
 - Create: `Sources/ClipFlowSystem/PasteboardMonitor.swift`
 - Create: `Tests/ClipFlowSystemTests/PasteboardMonitorTests.swift`
 
-- [ ] **Step 1: Write failing monitor tests using an injected pasteboard**
+- [x] **Step 1: Write failing monitor tests using an injected pasteboard**
 
 ```swift
 func testMonitorEmitsOncePerChangeAndIgnoresOwnWrite() async throws {
@@ -395,17 +395,17 @@ func testMonitorEmitsOncePerChangeAndIgnoresOwnWrite() async throws {
 }
 ```
 
-- [ ] **Step 2: Verify RED**
+- [x] **Step 2: Verify RED**
 
 Run: `swift test --filter PasteboardMonitorTests`
 
 Expected: compilation fails for monitor and pasteboard protocols.
 
-- [ ] **Step 3: Implement change observation and representation capture**
+- [x] **Step 3: Implement change observation and representation capture**
 
 Define a `PasteboardAccess` protocol and an `NSPasteboard` adapter. The actor-based monitor compares change counts, supports pause/resume and one expected ignored change, snapshots all item types as `Data`, and resolves the frontmost source application through `NSWorkspace`.
 
-- [ ] **Step 4: Verify GREEN and commit**
+- [x] **Step 4: Verify GREEN and commit**
 
 Run: `swift test --filter PasteboardMonitorTests && swift test`
 
