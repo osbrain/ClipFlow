@@ -3,13 +3,15 @@ import SwiftUI
 
 public struct MainPanelView: View {
     @Bindable private var model: AppModel
+    private let browserModel: BrowserTabModel?
     @FocusState private var searchFocused: Bool
     @State private var showingRename = false
     @State private var renameText = ""
     @State private var showingDeleteConfirmation = false
 
-    public init(model: AppModel) {
+    public init(model: AppModel, browserModel: BrowserTabModel? = nil) {
         self.model = model
+        self.browserModel = browserModel
     }
 
     public var body: some View {
@@ -17,25 +19,33 @@ public struct MainPanelView: View {
             header
             Divider()
             HStack(spacing: 0) {
-                CategorySidebar(model: model)
+                CategorySidebar(model: model, browserModel: browserModel)
                     .frame(width: 176)
                 Divider()
-                HistoryListView(model: model)
-                    .frame(minWidth: 320, idealWidth: 380, maxWidth: 440)
-                Divider()
-                DetailView(
-                    item: model.selectedItem,
-                    paste: { Task { await model.pasteSelection() } },
-                    favorite: { Task { await model.toggleFavoriteSelection() } },
-                    rename: {
-                        renameText = model.selectedItem?.customTitle
-                            ?? model.selectedItem?.previewText
-                            ?? ""
-                        showingRename = true
-                    },
-                    delete: { showingDeleteConfirmation = true }
-                )
-                .frame(minWidth: 300, maxWidth: .infinity)
+                if let browserModel, browserModel.isShowing {
+                    BrowserTabListView(model: browserModel)
+                        .frame(minWidth: 320, idealWidth: 380, maxWidth: 440)
+                    Divider()
+                    BrowserTabDetailView(model: browserModel)
+                        .frame(minWidth: 300, maxWidth: .infinity)
+                } else {
+                    HistoryListView(model: model)
+                        .frame(minWidth: 320, idealWidth: 380, maxWidth: 440)
+                    Divider()
+                    DetailView(
+                        item: model.selectedItem,
+                        paste: { Task { await model.pasteSelection() } },
+                        favorite: { Task { await model.toggleFavoriteSelection() } },
+                        rename: {
+                            renameText = model.selectedItem?.customTitle
+                                ?? model.selectedItem?.previewText
+                                ?? ""
+                            showingRename = true
+                        },
+                        delete: { showingDeleteConfirmation = true }
+                    )
+                    .frame(minWidth: 300, maxWidth: .infinity)
+                }
             }
         }
         .frame(minWidth: 760, minHeight: 480)
@@ -79,22 +89,38 @@ public struct MainPanelView: View {
                 .foregroundStyle(.tint)
                 .accessibilityLabel("ClipFlow")
 
-            TextField("Search clipboard history", text: $model.searchText)
+            TextField(
+                browserModel?.isShowing == true
+                    ? "Search browser tabs"
+                    : "Search clipboard history",
+                text: $model.searchText
+            )
                 .textFieldStyle(.plain)
                 .font(.system(size: 17))
                 .focused($searchFocused)
-                .onSubmit { Task { await model.pasteSelection() } }
-                .onChange(of: model.searchText) {
+                .onSubmit {
                     Task {
-                        try? await Task.sleep(for: .milliseconds(120))
-                        await model.reload()
+                        if browserModel?.isShowing == true {
+                            await browserModel?.activateSelection()
+                        } else {
+                            await model.pasteSelection()
+                        }
+                    }
+                }
+                .onChange(of: model.searchText) {
+                    browserModel?.searchText = model.searchText
+                    if browserModel?.isShowing != true {
+                        Task {
+                            try? await Task.sleep(for: .milliseconds(120))
+                            await model.reload()
+                        }
                     }
                 }
 
             if model.isLoading {
                 ProgressView().controlSize(.small)
             } else {
-                Text("\(model.items.count)")
+                Text("\(browserModel?.isShowing == true ? browserModel?.filteredTabs.count ?? 0 : model.items.count)")
                     .font(.caption.monospacedDigit())
                     .foregroundStyle(.secondary)
             }
@@ -107,18 +133,31 @@ public struct MainPanelView: View {
 
 private struct CategorySidebar: View {
     @Bindable var model: AppModel
+    let browserModel: BrowserTabModel?
     @State private var showingCreateCategory = false
     @State private var categoryName = ""
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 4) {
+                if let browserModel {
+                    sidebarButton(
+                        "Browser Tabs",
+                        icon: "macwindow.on.rectangle",
+                        selected: browserModel.isShowing
+                    ) {
+                        browserModel.isShowing = true
+                        Task { await browserModel.refresh() }
+                    }
+                }
                 sidebarButton("All", icon: "tray.full", selected: isAll) {
+                    browserModel?.isShowing = false
                     model.selectedKind = nil
                     model.selectedCategoryID = nil
                     model.favoritesOnly = false
                 }
                 sidebarButton("Favorites", icon: "star", selected: model.favoritesOnly) {
+                    browserModel?.isShowing = false
                     model.selectedKind = nil
                     model.selectedCategoryID = nil
                     model.favoritesOnly = true
@@ -131,7 +170,7 @@ private struct CategorySidebar: View {
                     .padding(.horizontal, 8)
 
                 sidebarButton("Text", icon: "text.alignleft", kind: .text)
-                sidebarButton("Rich Text", icon: "textformat", kind: .richText)
+                sidebarButton("Rich Text", icon: "doc.richtext", kind: .richText)
                 sidebarButton("Images", icon: "photo", kind: .image)
                 sidebarButton("Files", icon: "doc", kind: .file)
                 sidebarButton("Links", icon: "link", kind: .link)
@@ -159,6 +198,7 @@ private struct CategorySidebar: View {
                         icon: "folder",
                         selected: model.selectedCategoryID == category.id
                     ) {
+                        browserModel?.isShowing = false
                         model.selectedCategoryID = category.id
                         model.selectedKind = nil
                         model.favoritesOnly = false
@@ -183,7 +223,10 @@ private struct CategorySidebar: View {
     }
 
     private var isAll: Bool {
-        model.selectedKind == nil && model.selectedCategoryID == nil && !model.favoritesOnly
+        browserModel?.isShowing != true &&
+            model.selectedKind == nil &&
+            model.selectedCategoryID == nil &&
+            !model.favoritesOnly
     }
 
     private func sidebarButton(
@@ -192,6 +235,7 @@ private struct CategorySidebar: View {
         kind: ClipboardKind
     ) -> some View {
         sidebarButton(title, icon: icon, selected: model.selectedKind == kind) {
+            browserModel?.isShowing = false
             model.selectedKind = kind
             model.selectedCategoryID = nil
             model.favoritesOnly = false

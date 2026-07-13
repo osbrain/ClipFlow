@@ -63,8 +63,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 )
             )
             let model = AppModel(repository: repository, pasteService: pasteService)
+            let browserModel = BrowserTabModel(service: BrowserAutomation())
+            #if DEBUG
+            if ProcessInfo.processInfo.environment["CLIPFLOW_SHOW_BROWSER_TABS"] == "1" {
+                browserModel.isShowing = true
+            }
+            #endif
             let panelController = FloatingPanelController(
-                rootView: AnyView(ClipFlowRootView(model: model, settings: settings))
+                rootView: AnyView(
+                    ClipFlowRootView(
+                        model: model,
+                        settings: settings,
+                        browserModel: browserModel
+                    )
+                )
             )
             let hotKeyController = GlobalHotKeyController()
             try? hotKeyController.register(shortcut: settings.shortcut) { [weak self] in

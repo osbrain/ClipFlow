@@ -4,15 +4,24 @@ public struct ClipFlowRootView: View {
     @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding = false
     private let model: AppModel
     private let settings: SettingsModel
+    private let browserModel: BrowserTabModel?
 
-    public init(model: AppModel, settings: SettingsModel) {
+    public init(
+        model: AppModel,
+        settings: SettingsModel,
+        browserModel: BrowserTabModel? = nil
+    ) {
         self.model = model
         self.settings = settings
+        self.browserModel = browserModel
     }
 
     public var body: some View {
         if hasCompletedOnboarding {
-            MainPanelView(model: model)
+            MainPanelView(
+                model: model,
+                browserModel: settings.browserTabManagementEnabled ? browserModel : nil
+            )
         } else {
             OnboardingView(settings: settings) {
                 hasCompletedOnboarding = true

@@ -604,7 +604,7 @@ git commit -m "feat: add onboarding and settings"
 - Create: `Sources/ClipFlowSystem/BrowserAutomation.swift`
 - Create: `Tests/ClipFlowSystemTests/BrowserAutomationTests.swift`
 
-- [ ] **Step 1: Write failing status and payload decoding tests**
+- [x] **Step 1: Write failing status and payload decoding tests**
 
 ```swift
 func testBrowserStatusSeparatesNotInstalledNotRunningAndDenied() async {
@@ -618,17 +618,17 @@ func testBrowserStatusSeparatesNotInstalledNotRunningAndDenied() async {
 }
 ```
 
-- [ ] **Step 2: Verify RED**
+- [x] **Step 2: Verify RED**
 
 Run: `swift test --filter BrowserAutomationTests`
 
 Expected: compilation fails for browser types.
 
-- [ ] **Step 3: Implement local Apple Events adapters**
+- [x] **Step 3: Implement local Apple Events adapters**
 
 Use `NSAppleScript` for Safari and JavaScript for Automation for Chromium browsers. Enumeration returns browser, stable window/tab coordinates, title, and URL. Activation verifies the expected title and URL at the stored position before selecting; mismatch triggers refresh instead of activating the wrong tab.
 
-- [ ] **Step 4: Verify GREEN and commit**
+- [x] **Step 4: Verify GREEN and commit**
 
 Run: `swift test --filter BrowserAutomationTests && swift test`
 
