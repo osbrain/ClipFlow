@@ -38,7 +38,7 @@ struct WindowExperienceTests {
         )
     }
 
-    @Test("settings material extends behind its transparent title bar")
+    @Test("settings content reserves the native title bar layout area")
     func settingsWindowAppearance() {
         let window = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: 640, height: 700),
@@ -49,7 +49,7 @@ struct WindowExperienceTests {
 
         SettingsWindowAppearance.apply(to: window)
 
-        #expect(window.styleMask.contains(.fullSizeContentView))
+        #expect(!window.styleMask.contains(.fullSizeContentView))
         #expect(window.titlebarAppearsTransparent)
         #expect(!window.isOpaque)
         #expect(window.backgroundColor == .clear)

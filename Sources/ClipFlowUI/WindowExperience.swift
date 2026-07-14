@@ -10,7 +10,7 @@ public enum PanelDismissalPolicy {
 @MainActor
 public enum SettingsWindowAppearance {
     public static func apply(to window: NSWindow) {
-        window.styleMask.insert(.fullSizeContentView)
+        window.styleMask.remove(.fullSizeContentView)
         window.backgroundColor = .clear
         window.isOpaque = false
         window.titlebarAppearsTransparent = true
