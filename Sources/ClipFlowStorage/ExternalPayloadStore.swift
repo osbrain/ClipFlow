@@ -52,7 +52,16 @@ public struct ExternalPayloadStore: Sendable {
 
         let fileName = "\(id.uuidString.lowercased()).clipflowpayload"
         let destination = root.appendingPathComponent(fileName, isDirectory: false)
-        try file.write(to: destination, options: [.atomic, .completeFileProtectionUnlessOpen])
+        do {
+            try file.write(to: destination, options: .atomic)
+            try FileManager.default.setAttributes(
+                [.posixPermissions: 0o600],
+                ofItemAtPath: destination.path
+            )
+        } catch {
+            try? FileManager.default.removeItem(at: destination)
+            throw error
+        }
 
         return ExternalPayloadReference(
             fileName: fileName,
@@ -129,4 +138,3 @@ public struct ExternalPayloadStore: Sendable {
         data.map { String(format: "%02x", $0) }.joined()
     }
 }
-

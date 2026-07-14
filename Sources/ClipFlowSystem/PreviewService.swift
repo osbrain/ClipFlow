@@ -51,8 +51,16 @@ public struct PreviewService: Sendable {
         )
         let fileName = Self.fileName(suggestedName, typeIdentifier: payload.type)
         let destination = directory.appendingPathComponent(fileName, isDirectory: false)
-        try payload.data.write(to: destination, options: [.atomic, .completeFileProtectionUnlessOpen])
-        try fileManager.setAttributes([.posixPermissions: 0o600], ofItemAtPath: destination.path)
+        do {
+            try payload.data.write(to: destination, options: .atomic)
+            try fileManager.setAttributes(
+                [.posixPermissions: 0o600],
+                ofItemAtPath: destination.path
+            )
+        } catch {
+            try? fileManager.removeItem(at: directory)
+            throw error
+        }
         return PreviewArtifact(
             url: destination,
             isTemporary: true,
@@ -126,36 +134,71 @@ public struct PreviewService: Sendable {
 }
 
 @MainActor
-public final class QuickLookPreviewController: NSObject,
-    @preconcurrency QLPreviewPanelDataSource,
-    @preconcurrency QLPreviewPanelDelegate {
+public final class QuickLookPreviewController: NSObject, NSWindowDelegate {
     private let service: PreviewService
     private var artifact: PreviewArtifact?
+    private var panel: NSPanel?
 
     public init(service: PreviewService = PreviewService()) {
         self.service = service
     }
 
     public func show(payloads: [NormalizedPayload], suggestedName: String) throws {
-        if let artifact { try? service.cleanup(artifact) }
+        close()
         artifact = try service.prepare(payloads: payloads, suggestedName: suggestedName)
-        guard let panel = QLPreviewPanel.shared() else { return }
-        panel.dataSource = self
+        guard let artifact,
+              let previewView = QLPreviewView(
+                frame: NSRect(x: 0, y: 0, width: 520, height: 360),
+                style: .normal
+              ) else {
+            throw PreviewServiceError.unsupportedPayload
+        }
+        previewView.previewItem = artifact.url as NSURL
+        previewView.autostarts = true
+
+        let panel = NSPanel(
+            contentRect: NSRect(x: 0, y: 0, width: 520, height: 360),
+            styleMask: [.titled, .closable, .resizable, .utilityWindow],
+            backing: .buffered,
+            defer: false
+        )
+        panel.title = suggestedName
+        panel.minSize = NSSize(width: 360, height: 240)
+        panel.isReleasedWhenClosed = false
+        panel.level = .modalPanel
         panel.delegate = self
-        panel.reloadData()
+        panel.contentView = previewView
+        panel.center()
+        self.panel = panel
         panel.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
     }
 
-    public func numberOfPreviewItems(in panel: QLPreviewPanel!) -> Int {
-        artifact == nil ? 0 : 1
+    public var isPreviewVisible: Bool {
+        panel?.isVisible == true
     }
 
-    public func previewPanel(_ panel: QLPreviewPanel!, previewItemAt index: Int) -> any QLPreviewItem {
-        artifact!.url as NSURL
+    public var previewWindowTitle: String? {
+        panel?.title
     }
 
-    public func previewPanelWillClose(_ panel: QLPreviewPanel!) {
-        if let artifact { try? service.cleanup(artifact) }
+    public func close() {
+        panel?.delegate = nil
+        panel?.close()
+        panel = nil
+        cleanupArtifact()
+    }
+
+    public func windowWillClose(_ notification: Notification) {
+        guard notification.object as? NSPanel === panel else { return }
+        panel = nil
+        cleanupArtifact()
+    }
+
+    private func cleanupArtifact() {
+        if let artifact {
+            try? service.cleanup(artifact)
+        }
         artifact = nil
     }
 }

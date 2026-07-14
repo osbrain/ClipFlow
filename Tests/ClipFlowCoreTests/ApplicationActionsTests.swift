@@ -69,8 +69,33 @@ struct ApplicationActionsTests {
         #expect(artifact.isTemporary)
         #expect(artifact.url.pathExtension == "png")
         #expect(FileManager.default.fileExists(atPath: artifact.url.path))
+        #expect(try Data(contentsOf: artifact.url) == Data([0x89, 0x50, 0x4e, 0x47]))
+        let attributes = try FileManager.default.attributesOfItem(atPath: artifact.url.path)
+        let permissions = try #require(attributes[.posixPermissions] as? NSNumber)
+        #expect(permissions.intValue & 0o777 == 0o600)
         try service.cleanup(artifact)
         #expect(!FileManager.default.fileExists(atPath: artifact.url.path))
+    }
+
+    @MainActor
+    @Test("Quick Look controller presents an owned preview window")
+    func quickLookControllerPresentsOwnedWindow() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let controller = QuickLookPreviewController(
+            service: PreviewService(root: root)
+        )
+
+        try controller.show(
+            payloads: [Self.payload("public.utf8-plain-text", "Preview body")],
+            suggestedName: "Preview Fixture"
+        )
+
+        #expect(controller.isPreviewVisible)
+        #expect(controller.previewWindowTitle == "Preview Fixture")
+        controller.close()
+        #expect(!controller.isPreviewVisible)
     }
 
     @Test("uses an existing file directly for preview and drag")

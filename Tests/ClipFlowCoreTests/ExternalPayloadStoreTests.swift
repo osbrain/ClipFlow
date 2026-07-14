@@ -16,6 +16,9 @@ struct ExternalPayloadStoreTests {
         let plaintext = Data("secret clipboard content".utf8)
         let reference = try store.write(plaintext, id: UUID())
         let fileURL = root.appendingPathComponent(reference.fileName)
+        let attributes = try FileManager.default.attributesOfItem(atPath: fileURL.path)
+        let permissions = try #require(attributes[.posixPermissions] as? NSNumber)
+        #expect(permissions.intValue & 0o777 == 0o600)
         let encryptedBytes = try Data(contentsOf: fileURL)
 
         #expect(encryptedBytes.range(of: plaintext) == nil)
