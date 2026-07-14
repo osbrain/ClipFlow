@@ -38,4 +38,25 @@ struct AppearancePreferencesTests {
         #expect(L10n.string("settings.title", language: .english) == "Settings")
         #expect(L10n.locale(for: .english).identifier.hasPrefix("en"))
     }
+
+    @Test("system language follows the first supported macOS preferred language")
+    func systemLanguageFollowsMacOSPreferences() {
+        #expect(
+            L10n.systemLanguageIdentifier(
+                preferredLanguages: ["zh-Hans-CN", "en-US"]
+            ) == "zh-Hans"
+        )
+        #expect(
+            L10n.string(
+                "settings.title",
+                language: .system,
+                preferredLanguages: ["zh-Hans-CN", "en-US"]
+            ) == "设置"
+        )
+        #expect(
+            L10n.systemLanguageIdentifier(
+                preferredLanguages: ["fr-FR", "en-US"]
+            ) == "en"
+        )
+    }
 }

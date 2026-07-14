@@ -1,6 +1,8 @@
 "app.name" = "ClipFlow";
 "app.startup.error.title" = "ClipFlow Could Not Start";
 "app.privacy.subtitle" = "Encrypted clipboard history on this Mac";
+"header.pasteTarget" = "Paste destination";
+"header.clipboardTarget" = "System Clipboard";
 "common.cancel" = "Cancel";
 "common.save" = "Save";
 "common.create" = "Create";

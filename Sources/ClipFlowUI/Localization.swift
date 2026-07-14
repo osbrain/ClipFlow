@@ -37,7 +37,10 @@ public enum L10n {
             return Locale(identifier: identifier)
         }
         #endif
-        return selectedLocaleIdentifier.map(Locale.init(identifier:)) ?? .current
+        return effectiveLocaleIdentifier(
+            language: configuredLanguageSnapshot,
+            preferredLanguages: Locale.preferredLanguages
+        ).map(Locale.init(identifier:)) ?? .current
     }
 
     public static func string(_ key: String) -> String {
@@ -48,7 +51,10 @@ public enum L10n {
             return string(key, locale: identifier)
         }
         #endif
-        guard let identifier = selectedLocaleIdentifier else {
+        guard let identifier = effectiveLocaleIdentifier(
+            language: configuredLanguageSnapshot,
+            preferredLanguages: Locale.preferredLanguages
+        ) else {
             return Bundle.module.localizedString(forKey: key, value: key, table: nil)
         }
         return string(key, locale: identifier)
@@ -73,14 +79,32 @@ public enum L10n {
     }
 
     public static func string(_ key: String, language: AppLanguage) -> String {
-        guard let identifier = language.localeIdentifier else {
+        string(
+            key,
+            language: language,
+            preferredLanguages: Locale.preferredLanguages
+        )
+    }
+
+    static func string(
+        _ key: String,
+        language: AppLanguage,
+        preferredLanguages: [String]
+    ) -> String {
+        guard let identifier = effectiveLocaleIdentifier(
+            language: language,
+            preferredLanguages: preferredLanguages
+        ) else {
             return Bundle.module.localizedString(forKey: key, value: key, table: nil)
         }
         return string(key, locale: identifier)
     }
 
     public static func locale(for language: AppLanguage) -> Locale {
-        language.localeIdentifier.map(Locale.init(identifier:)) ?? .current
+        effectiveLocaleIdentifier(
+            language: language,
+            preferredLanguages: Locale.preferredLanguages
+        ).map(Locale.init(identifier:)) ?? .current
     }
 
     public static func formattedDateTime(_ date: Date) -> String {
@@ -117,8 +141,33 @@ public enum L10n {
         return formatter.string(from: date)
     }
 
-    private static var selectedLocaleIdentifier: String? {
-        languageLock.withLock { configuredLanguage.localeIdentifier }
+    static func systemLanguageIdentifier(
+        preferredLanguages: [String]
+    ) -> String? {
+        for identifier in preferredLanguages {
+            let normalized = identifier.replacingOccurrences(of: "_", with: "-").lowercased()
+            if normalized == "zh" || normalized.hasPrefix("zh-hans") ||
+                normalized.hasPrefix("zh-cn") || normalized.hasPrefix("zh-sg") {
+                return "zh-Hans"
+            }
+            if normalized == "en" || normalized.hasPrefix("en-") {
+                return "en"
+            }
+        }
+        return nil
+    }
+
+    private static var configuredLanguageSnapshot: AppLanguage {
+        languageLock.withLock { configuredLanguage }
+    }
+
+    private static func effectiveLocaleIdentifier(
+        language: AppLanguage,
+        preferredLanguages: [String]
+    ) -> String? {
+        language.localeIdentifier ?? systemLanguageIdentifier(
+            preferredLanguages: preferredLanguages
+        )
     }
 
     private static func environmentLocaleIdentifier(

@@ -118,7 +118,9 @@ struct ClipboardKindPresentationTests {
             "settings.dismissError",
             "settings.logPath",
             "settings.logNotCreated",
-            "settings.revealLog"
+            "settings.revealLog",
+            "header.pasteTarget",
+            "header.clipboardTarget"
         ]
 
         for key in keys {

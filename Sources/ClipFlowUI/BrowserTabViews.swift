@@ -59,6 +59,7 @@ struct BrowserTabListView: View {
                         .padding(.horizontal, ClipFlowVisualStyle.panelPadding)
                         .padding(.bottom, ClipFlowVisualStyle.panelPadding)
                     }
+                    .clipFlowScrollAppearance()
                     .onChange(of: model.selectedTabID) { _, selectedTabID in
                         guard let selectedTabID else { return }
                         withAnimation(.easeOut(duration: 0.16)) {
@@ -153,6 +154,7 @@ private struct BrowserTabEmptyState: View {
                 }
                 .padding(ClipFlowVisualStyle.panelPadding)
             }
+            .clipFlowScrollAppearance()
         }
     }
 }
@@ -210,6 +212,7 @@ struct BrowserTabDetailView: View {
                 }
                 .padding(ClipFlowVisualStyle.panelPadding)
             }
+            .clipFlowScrollAppearance()
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(Color(nsColor: .underPageBackgroundColor).opacity(0.32))
         } else {

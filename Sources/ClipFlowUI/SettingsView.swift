@@ -44,7 +44,12 @@ public struct SettingsView: View {
             }
             .padding(18)
         }
-        .background(Color(nsColor: .windowBackgroundColor))
+        .clipFlowScrollAppearance()
+        .background {
+            Rectangle()
+                .fill(.regularMaterial)
+                .ignoresSafeArea()
+        }
         .id(model.appLanguage)
         .environment(\.locale, L10n.locale)
         .onChange(of: snapshot) { previous, current in

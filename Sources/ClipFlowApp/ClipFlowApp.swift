@@ -28,6 +28,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem?
     private var settingsWindow: NSWindowController?
     private var settingsModel: SettingsModel?
+    private var appModel: AppModel?
     private var isRestoringRuntimeSettings = false
     private let loginItemService = LoginItemService()
 
@@ -249,6 +250,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             self.monitor = pasteboardMonitor
             self.pasteService = pasteService
             self.settingsModel = settings
+            self.appModel = model
             self.logger = logger
             self.settingsCoordinator = AppSettingsCoordinator(
                 repository: repository,
@@ -343,6 +345,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if let pasteService {
             Task { await pasteService.setTarget(target) }
         }
+        appModel?.updatePasteDestination(
+            name: target == nil ? nil : application?.localizedName
+        )
     }
 
     private func handlePanelCommand(
@@ -511,6 +516,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         window.title = L10n.string("settings.window.title")
         window.minSize = NSSize(width: 560, height: 520)
         window.isReleasedWhenClosed = false
+        SettingsWindowAppearance.apply(to: window)
         window.center()
         window.contentView = NSHostingView(
             rootView: SettingsWindowRootView(

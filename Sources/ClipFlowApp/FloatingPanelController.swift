@@ -30,7 +30,7 @@ final class FloatingPanelController: NSWindowController, NSWindowDelegate {
         )
         panel.level = .floating
         panel.isReleasedWhenClosed = false
-        panel.hidesOnDeactivate = false
+        panel.hidesOnDeactivate = true
         panel.isMovableByWindowBackground = true
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .transient]
         panel.backgroundColor = .clear
@@ -91,6 +91,13 @@ final class FloatingPanelController: NSWindowController, NSWindowDelegate {
     func windowWillClose(_ notification: Notification) {
         inputState.isPanelVisible = false
         removeEventMonitor()
+    }
+
+    func windowDidResignKey(_ notification: Notification) {
+        guard PanelDismissalPolicy.shouldHideOnResign(
+            isPresentingSheet: inputState.isPresentingSheet
+        ) else { return }
+        hide()
     }
 
     func windowDidMove(_ notification: Notification) {

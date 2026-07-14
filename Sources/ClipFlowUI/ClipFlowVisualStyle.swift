@@ -1,6 +1,7 @@
 import SwiftUI
 
 enum ClipFlowVisualStyle {
+    static let windowRadius: CGFloat = 18
     static let cardRadius: CGFloat = 12
     static let controlRadius: CGFloat = 9
     static let hairlineOpacity = 0.16
@@ -8,6 +9,7 @@ enum ClipFlowVisualStyle {
     static let selectedBorderOpacity = 0.9
     static let panelPadding: CGFloat = 12
     static let sectionSpacing: CGFloat = 16
+    static let scrollIndicatorOpacity: CGFloat = 0.42
     static let hairlineColor = Color(nsColor: .separatorColor)
     static let hoverFillColor = Color.primary.opacity(0.08)
 }

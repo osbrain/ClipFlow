@@ -1,6 +1,8 @@
 "app.name" = "ClipFlow";
 "app.startup.error.title" = "ClipFlow 无法启动";
 "app.privacy.subtitle" = "剪贴板历史已加密保存在这台 Mac 上";
+"header.pasteTarget" = "粘贴目标";
+"header.clipboardTarget" = "系统剪贴板";
 "common.cancel" = "取消";
 "common.save" = "保存";
 "common.create" = "创建";

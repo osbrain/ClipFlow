@@ -53,6 +53,7 @@ public final class AppModel {
     public private(set) var errorMessage: String?
     public private(set) var lastPasteOutcome: PasteOutcome?
     public private(set) var visuals: [UUID: ClipboardVisualDescriptor] = [:]
+    public private(set) var pasteDestinationName: String?
 
     @ObservationIgnored private let repository: any HistoryRepository
     @ObservationIgnored private let pasteService: any PasteServing
@@ -77,6 +78,10 @@ public final class AppModel {
     public var selectedItem: ClipboardItem? {
         guard let selectedItemID else { return nil }
         return items.first { $0.id == selectedItemID }
+    }
+
+    public func updatePasteDestination(name: String?) {
+        pasteDestinationName = name
     }
 
     public func apply(_ filter: HistoryFilter) {

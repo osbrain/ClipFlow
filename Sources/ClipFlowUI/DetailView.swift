@@ -36,6 +36,7 @@ struct DetailView: View {
                     }
                     .padding(ClipFlowVisualStyle.panelPadding)
                 }
+                .clipFlowScrollAppearance()
             } else {
                 ContentUnavailableView(
                     L10n.string("detail.empty.title"),

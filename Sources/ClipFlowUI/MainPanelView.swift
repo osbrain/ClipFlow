@@ -35,9 +35,8 @@ public struct MainPanelView: View {
     public var body: some View {
         VStack(spacing: 0) {
             ClipFlowHeader(
-                item: model.selectedItem,
-                visual: model.selectedItemID.flatMap { model.visuals[$0] },
                 browserTab: browserModel?.isShowing == true ? browserModel?.selectedTab : nil,
+                pasteDestinationName: model.pasteDestinationName,
                 showSettings: {
                     focusTarget = nil
                     showSettings()
@@ -61,6 +60,12 @@ public struct MainPanelView: View {
         }
         .frame(minWidth: 800, minHeight: 520)
         .background(.regularMaterial)
+        .clipShape(
+            RoundedRectangle(
+                cornerRadius: ClipFlowVisualStyle.windowRadius,
+                style: .continuous
+            )
+        )
         .overlay(alignment: .bottom) {
             if let errorMessage = activeErrorMessage {
                 Text(errorMessage)
@@ -384,9 +389,8 @@ public struct MainPanelView: View {
 }
 
 private struct ClipFlowHeader: View {
-    let item: ClipboardItem?
-    let visual: ClipboardVisualDescriptor?
     let browserTab: ClipFlowSystem.BrowserTab?
+    let pasteDestinationName: String?
     let showSettings: () -> Void
 
     var body: some View {
@@ -421,12 +425,15 @@ private struct ClipFlowHeader: View {
                     title: browserTab.browser.displayName,
                     subtitle: browserTab.title
                 )
-            } else if let item {
+            } else {
                 HeaderSourceContext(
-                    icon: visual?.applicationIcon,
-                    fallbackSymbol: "app.dashed",
-                    title: item.appName,
-                    subtitle: L10n.formattedDateTime(item.updatedAt)
+                    icon: nil,
+                    fallbackSymbol: pasteDestinationName == nil
+                        ? "clipboard"
+                        : "arrow.right.circle.fill",
+                    title: pasteDestinationName
+                        ?? L10n.string("header.clipboardTarget"),
+                    subtitle: L10n.string("header.pasteTarget")
                 )
             }
 
@@ -656,6 +663,7 @@ private struct HistoryCardList: View {
                         .padding(.horizontal, ClipFlowVisualStyle.panelPadding)
                         .padding(.bottom, ClipFlowVisualStyle.panelPadding)
                     }
+                    .clipFlowScrollAppearance()
                     .onChange(of: model.selectedItemID) { _, selectedItemID in
                         guard let selectedItemID else { return }
                         withAnimation(.easeOut(duration: 0.16)) {

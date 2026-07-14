@@ -8,6 +8,20 @@ import ClipFlowSystem
 @Suite("Application model")
 @MainActor
 struct AppModelTests {
+    @Test("paste destination is visible and can be cleared")
+    func tracksPasteDestination() {
+        let model = AppModel(
+            repository: FakeHistoryRepository(items: []),
+            pasteService: FakePasteService()
+        )
+
+        model.updatePasteDestination(name: "Notes")
+        #expect(model.pasteDestinationName == "Notes")
+
+        model.updatePasteDestination(name: nil)
+        #expect(model.pasteDestinationName == nil)
+    }
+
     @Test("search selects the first result and paste marks it used")
     func searchSelectsFirstResultAndPasteMarksUsage() async throws {
         let alpha = Self.item(preview: "Alpha")
