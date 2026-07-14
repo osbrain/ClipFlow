@@ -111,7 +111,14 @@ struct ClipboardKindPresentationTests {
             "settings.language",
             "settings.language.system",
             "settings.language.simplifiedChinese",
-            "settings.language.english"
+            "settings.language.english",
+            "settings.error.shortcut",
+            "settings.error.loginItem",
+            "settings.error.runtime",
+            "settings.dismissError",
+            "settings.logPath",
+            "settings.logNotCreated",
+            "settings.revealLog"
         ]
 
         for key in keys {

@@ -98,7 +98,7 @@
 "browser.status.authorized" = "Connected";
 "settings.title" = "Settings";
 "settings.window.title" = "ClipFlow Settings";
-"settings.subtitle" = "Preferences, permissions, and updates";
+"settings.subtitle" = "Preferences, permissions, and diagnostics";
 "settings.general" = "General";
 "settings.language" = "Language";
 "settings.language.system" = "Follow System";
@@ -106,7 +106,7 @@
 "settings.language.english" = "English";
 "settings.retention" = "Retention and Storage";
 "settings.permissions" = "Permissions and Integrations";
-"settings.startup" = "Startup and Updates";
+"settings.startup" = "Startup";
 "settings.details" = "Detail Fields";
 "settings.diagnostics" = "Diagnostics";
 "settings.appearance.system" = "Follow System";
@@ -142,7 +142,6 @@
 "settings.browserTabs" = "Browser Tab Management";
 "settings.feishuAction" = "Send to Feishu Action";
 "settings.doubaoAction" = "Ask Doubao Action";
-"settings.autoUpdates" = "Check for Updates Automatically";
 "settings.showSource" = "Source Application";
 "settings.showKind" = "Content Kind";
 "settings.showCreated" = "Created Time";
@@ -150,3 +149,10 @@
 "settings.showSize" = "File Size";
 "settings.showFormatting" = "Formatting Availability";
 "settings.debugLogging" = "Redacted Debug Logging";
+"settings.error.shortcut" = "Could not register the selected shortcut: %@";
+"settings.error.loginItem" = "Could not update Launch at Login: %@";
+"settings.error.runtime" = "Could not apply this setting: %@";
+"settings.dismissError" = "Dismiss Error";
+"settings.logPath" = "Local Log";
+"settings.logNotCreated" = "Log file has not been created yet";
+"settings.revealLog" = "Show in Finder";

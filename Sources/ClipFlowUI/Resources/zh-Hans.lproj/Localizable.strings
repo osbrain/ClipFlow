@@ -98,7 +98,7 @@
 "browser.status.authorized" = "已连接";
 "settings.title" = "设置";
 "settings.window.title" = "ClipFlow 设置";
-"settings.subtitle" = "偏好、授权和更新";
+"settings.subtitle" = "偏好、授权与诊断";
 "settings.general" = "通用";
 "settings.language" = "语言";
 "settings.language.system" = "跟随系统";
@@ -106,7 +106,7 @@
 "settings.language.english" = "English";
 "settings.retention" = "保留与存储";
 "settings.permissions" = "权限与集成";
-"settings.startup" = "启动与更新";
+"settings.startup" = "启动";
 "settings.details" = "详情字段";
 "settings.diagnostics" = "诊断";
 "settings.appearance.system" = "跟随系统";
@@ -142,7 +142,6 @@
 "settings.browserTabs" = "浏览器标签页管理";
 "settings.feishuAction" = "发送到飞书";
 "settings.doubaoAction" = "询问豆包";
-"settings.autoUpdates" = "自动检查更新";
 "settings.showSource" = "来源应用";
 "settings.showKind" = "内容类型";
 "settings.showCreated" = "创建时间";
@@ -150,3 +149,10 @@
 "settings.showSize" = "内容大小";
 "settings.showFormatting" = "原格式可用性";
 "settings.debugLogging" = "脱敏调试日志";
+"settings.error.shortcut" = "无法注册所选快捷键：%@";
+"settings.error.loginItem" = "无法更新开机自启动：%@";
+"settings.error.runtime" = "无法应用此设置：%@";
+"settings.dismissError" = "关闭错误提示";
+"settings.logPath" = "本地日志";
+"settings.logNotCreated" = "日志文件尚未创建";
+"settings.revealLog" = "在访达中显示";

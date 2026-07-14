@@ -56,7 +56,11 @@ final class AppSettingsCoordinator {
         let changes = current.changes(from: previous)
 
         if changes.contains(.shortcut) {
-            try updateShortcut(current.shortcut, previous.shortcut)
+            do {
+                try updateShortcut(current.shortcut, previous.shortcut)
+            } catch {
+                throw AppSettingsCoordinatorError.shortcutRegistrationFailed(error)
+            }
         }
         if changes.contains(.language) {
             updateLanguage(current.appLanguage)
@@ -75,11 +79,25 @@ final class AppSettingsCoordinator {
         if changes.contains(.retention) {
             let policy = current.retention.policy
             retentionPolicyStore.update(policy)
-            let deleted = try repository.applyRetention(policy)
+            let deleted: [UUID]
+            do {
+                deleted = try repository.applyRetention(policy)
+            } catch {
+                throw AppSettingsCoordinatorError.retentionFailed(error)
+            }
             await logger.log("retention_cleanup", metadata: ["deletedCount": "\(deleted.count)"])
         }
         if changes.contains(.debugLogging) {
             await logger.setEnabled(current.debugLoggingEnabled)
+            await logger.log(
+                "debug_logging_changed",
+                metadata: ["enabled": "\(current.debugLoggingEnabled)"]
+            )
         }
     }
+}
+
+enum AppSettingsCoordinatorError: Error {
+    case shortcutRegistrationFailed(any Error)
+    case retentionFailed(any Error)
 }

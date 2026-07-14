@@ -72,13 +72,63 @@ struct SettingsModelTests {
 
         model.showDetailSize = false
         model.showDetailFormatting = false
-        model.autoCheckUpdatesEnabled = false
         model.save()
 
         let restored = SettingsModel(store: store, permissions: permissions)
         #expect(!restored.showDetailSize)
         #expect(!restored.showDetailFormatting)
-        #expect(!restored.autoCheckUpdatesEnabled)
+    }
+
+    @Test("legacy automatic update preference is ignored")
+    func ignoresLegacyAutomaticUpdatePreference() {
+        let store = MemorySettingsStore(values: ["autoCheckUpdatesEnabled": true])
+        let model = SettingsModel(
+            store: store,
+            permissions: FakePermissionStatus(accessibilityTrusted: false)
+        )
+
+        model.save()
+
+        #expect(!Mirror(reflecting: model).children.contains {
+            $0.label == "autoCheckUpdatesEnabled"
+        })
+        #expect(!store.writtenKeys.contains("autoCheckUpdatesEnabled"))
+    }
+
+    @Test("runtime errors can be reported and cleared")
+    func reportsAndClearsRuntimeErrors() {
+        let model = SettingsModel(
+            store: MemorySettingsStore(),
+            permissions: FakePermissionStatus(accessibilityTrusted: false)
+        )
+
+        model.reportRuntimeError("Shortcut is unavailable")
+        #expect(model.runtimeErrorMessage == "Shortcut is unavailable")
+
+        model.clearRuntimeError()
+        #expect(model.runtimeErrorMessage == nil)
+    }
+
+    @Test("diagnostic log availability follows the configured file")
+    func refreshesDiagnosticLogAvailability() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let logURL = root.appendingPathComponent("ClipFlow.log")
+        let model = SettingsModel(
+            store: MemorySettingsStore(),
+            permissions: FakePermissionStatus(accessibilityTrusted: false),
+            diagnosticLogURL: logURL
+        )
+
+        model.refreshDiagnostics()
+        #expect(model.diagnosticLogURL == logURL)
+        #expect(!model.isDiagnosticLogAvailable)
+
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        try Data("log".utf8).write(to: logURL)
+        model.refreshDiagnostics()
+        #expect(model.isDiagnosticLogAvailable)
     }
 
     @Test("clamps storage threshold and refreshes permission state")
@@ -177,6 +227,12 @@ private final class MemorySettingsStore: SettingsStoring, @unchecked Sendable {
         self.values = values
     }
 
+    private var written = Set<String>()
+
+    var writtenKeys: Set<String> {
+        lock.withLock { written }
+    }
+
     func bool(forKey key: String) -> Bool {
         lock.withLock { values[key] as? Bool ?? false }
     }
@@ -190,7 +246,10 @@ private final class MemorySettingsStore: SettingsStoring, @unchecked Sendable {
     }
 
     func set(_ value: Any?, forKey key: String) {
-        lock.withLock { values[key] = value }
+        lock.withLock {
+            values[key] = value
+            written.insert(key)
+        }
     }
 
     func containsValue(forKey key: String) -> Bool {

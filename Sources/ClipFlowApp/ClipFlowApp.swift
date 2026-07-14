@@ -28,6 +28,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem?
     private var settingsWindow: NSWindowController?
     private var settingsModel: SettingsModel?
+    private var isRestoringRuntimeSettings = false
     private let loginItemService = LoginItemService()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -56,12 +57,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             let runtimeDefaults = try Self.runtimeUserDefaults(
                 visualAcceptanceConfiguration: visualAcceptanceConfiguration
             )
-            let settings = SettingsModel(store: runtimeDefaults)
+            let logURL = support.appendingPathComponent("ClipFlow.log")
+            let settings = SettingsModel(
+                store: runtimeDefaults,
+                diagnosticLogURL: logURL
+            )
             L10n.configure(language: settings.appLanguage)
             let logger = LocalLogger(
-                fileURL: support.appendingPathComponent("ClipFlow.log"),
+                fileURL: logURL,
                 enabled: settings.debugLoggingEnabled
             )
+            do {
+                try loginItemService.setEnabled(settings.launchAtLogin)
+            } catch {
+                settings.reportRuntimeError(
+                    L10n.format("settings.error.loginItem", error.localizedDescription)
+                )
+            }
             let keyData = try Self.databaseKey(applicationSupport: support)
             let database = try SQLCipherDatabase(
                 url: support.appendingPathComponent("ClipFlow.sqlite"),
@@ -181,8 +193,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             let hotKeyController: GlobalHotKeyController?
             if visualAcceptanceConfiguration == nil {
                 let controller = GlobalHotKeyController()
-                try? controller.register(shortcut: settings.shortcut) { [weak self] in
-                    self?.togglePanel()
+                do {
+                    try controller.register(shortcut: settings.shortcut) { [weak self] in
+                        self?.togglePanel()
+                    }
+                } catch {
+                    settings.reportRuntimeError(
+                        L10n.format("settings.error.shortcut", error.localizedDescription)
+                    )
                 }
                 hotKeyController = controller
             } else {
@@ -492,17 +510,51 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 loginItemService: loginItemService,
                 onRuntimeSettingsChange: { [weak self, weak settingsModel] previous, current in
                     Task { @MainActor in
+                        guard let self, let settingsModel else { return }
+                        if self.isRestoringRuntimeSettings {
+                            self.isRestoringRuntimeSettings = false
+                            return
+                        }
                         do {
-                            try await self?.settingsCoordinator?.apply(
+                            try await self.settingsCoordinator?.apply(
                                 previous: previous,
                                 current: current
                             )
+                            settingsModel.clearRuntimeError()
+                            settingsModel.refreshDiagnostics()
                         } catch {
-                            await self?.logger?.log(
+                            await self.logger?.log(
                                 "settings_application_error",
                                 metadata: ["errorType": String(describing: type(of: error))]
                             )
-                            settingsModel?.save()
+                            switch error {
+                            case AppSettingsCoordinatorError.shortcutRegistrationFailed(
+                                let underlying
+                            ):
+                                self.isRestoringRuntimeSettings = true
+                                settingsModel.shortcut = previous.shortcut
+                                settingsModel.save()
+                                settingsModel.reportRuntimeError(
+                                    L10n.format(
+                                        "settings.error.shortcut",
+                                        underlying.localizedDescription
+                                    )
+                                )
+                            case AppSettingsCoordinatorError.retentionFailed(let underlying):
+                                settingsModel.reportRuntimeError(
+                                    L10n.format(
+                                        "settings.error.runtime",
+                                        underlying.localizedDescription
+                                    )
+                                )
+                            default:
+                                settingsModel.reportRuntimeError(
+                                    L10n.format(
+                                        "settings.error.runtime",
+                                        error.localizedDescription
+                                    )
+                                )
+                            }
                         }
                     }
                 }
@@ -588,7 +640,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         )
         defaults.set(false, forKey: "showStatusBarItem")
         defaults.set(false, forKey: "launchAtLogin")
-        defaults.set(false, forKey: "autoCheckUpdatesEnabled")
         defaults.set(true, forKey: "hasCompletedOnboarding")
         return defaults
     }

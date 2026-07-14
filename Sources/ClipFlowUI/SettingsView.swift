@@ -10,6 +10,7 @@ public struct SettingsView: View {
         AppSettingsRuntimeSnapshot,
         AppSettingsRuntimeSnapshot
     ) -> Void
+    @State private var isRestoringLoginItem = false
 
     public init(
         model: SettingsModel,
@@ -28,6 +29,12 @@ public struct SettingsView: View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 18) {
                 SettingsHeader()
+                if let message = model.runtimeErrorMessage {
+                    SettingsErrorBanner(
+                        message: message,
+                        dismiss: model.clearRuntimeError
+                    )
+                }
                 generalSection
                 retentionSection
                 permissionsSection
@@ -44,7 +51,10 @@ public struct SettingsView: View {
             model.save()
             onRuntimeSettingsChange(previous.runtimeSnapshot, current.runtimeSnapshot)
         }
-        .task { await model.refreshPermissions() }
+        .task {
+            await model.refreshPermissions()
+            model.refreshDiagnostics()
+        }
     }
 
     private var generalSection: some View {
@@ -205,15 +215,22 @@ public struct SettingsView: View {
                     title: L10n.string("settings.launchAtLogin"),
                     isOn: $model.launchAtLogin
                 )
-                .onChange(of: model.launchAtLogin) {
-                    try? loginItemService.setEnabled(model.launchAtLogin)
+                .onChange(of: model.launchAtLogin) { previous, current in
+                    if isRestoringLoginItem {
+                        isRestoringLoginItem = false
+                        return
+                    }
+                    do {
+                        try loginItemService.setEnabled(current)
+                        model.clearRuntimeError()
+                    } catch {
+                        model.reportRuntimeError(
+                            L10n.format("settings.error.loginItem", error.localizedDescription)
+                        )
+                        isRestoringLoginItem = true
+                        model.launchAtLogin = previous
+                    }
                 }
-
-                toggleRow(
-                    icon: "arrow.triangle.2.circlepath",
-                    title: L10n.string("settings.autoUpdates"),
-                    isOn: $model.autoCheckUpdatesEnabled
-                )
             }
         }
     }
@@ -257,12 +274,42 @@ public struct SettingsView: View {
 
     private var diagnosticsSection: some View {
         GlassSection(title: L10n.string("settings.diagnostics"), icon: "stethoscope") {
-            toggleRow(
-                icon: "ladybug",
-                title: L10n.string("settings.debugLogging"),
-                isOn: $model.debugLoggingEnabled
-            )
+            VStack(spacing: 10) {
+                toggleRow(
+                    icon: "ladybug",
+                    title: L10n.string("settings.debugLogging"),
+                    isOn: $model.debugLoggingEnabled
+                )
+
+                GlassRow(icon: "doc.text", title: L10n.string("settings.logPath")) {
+                    Text(
+                        model.diagnosticLogURL?.path
+                            ?? L10n.string("settings.logNotCreated")
+                    )
+                    .font(.caption.monospaced())
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                    .help(model.diagnosticLogURL?.path ?? L10n.string("settings.logNotCreated"))
+
+                    Button {
+                        revealDiagnosticLog()
+                    } label: {
+                        Label(L10n.string("settings.revealLog"), systemImage: "folder")
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                    .disabled(!model.isDiagnosticLogAvailable)
+                    .help(L10n.string("settings.revealLog"))
+                }
+            }
         }
+    }
+
+    private func revealDiagnosticLog() {
+        guard let url = model.diagnosticLogURL,
+              model.isDiagnosticLogAvailable else { return }
+        NSWorkspace.shared.activateFileViewerSelecting([url])
     }
 
     private func toggleRow(icon: String, title: String, isOn: Binding<Bool>) -> some View {
@@ -327,7 +374,6 @@ public struct SettingsView: View {
             browserTabManagementEnabled: model.browserTabManagementEnabled,
             feishuActionEnabled: model.feishuActionEnabled,
             doubaoActionEnabled: model.doubaoActionEnabled,
-            autoCheckUpdatesEnabled: model.autoCheckUpdatesEnabled,
             debugLoggingEnabled: model.debugLoggingEnabled,
             defaultPasteMode: model.defaultPasteMode,
             detailFlags: [
@@ -401,7 +447,6 @@ private struct SettingsSnapshot: Equatable {
     let browserTabManagementEnabled: Bool
     let feishuActionEnabled: Bool
     let doubaoActionEnabled: Bool
-    let autoCheckUpdatesEnabled: Bool
     let debugLoggingEnabled: Bool
     let defaultPasteMode: String
     let detailFlags: [Bool]
@@ -419,6 +464,34 @@ private struct SettingsSnapshot: Equatable {
                 maximumStorageMB: maximumStorageMB
             ),
             debugLoggingEnabled: debugLoggingEnabled
+        )
+    }
+}
+
+private struct SettingsErrorBanner: View {
+    let message: String
+    let dismiss: () -> Void
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 10) {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .foregroundStyle(.orange)
+                .accessibilityHidden(true)
+            Text(message)
+                .font(.callout)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            Button(action: dismiss) {
+                Image(systemName: "xmark")
+            }
+            .buttonStyle(.plain)
+            .help(L10n.string("settings.dismissError"))
+            .accessibilityLabel(L10n.string("settings.dismissError"))
+        }
+        .padding(12)
+        .background(.orange.opacity(0.1), in: RoundedRectangle(cornerRadius: 12))
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(.orange.opacity(0.28), lineWidth: 1)
         )
     }
 }

@@ -50,7 +50,6 @@ public final class SettingsModel {
     public var browserTabManagementEnabled: Bool
     public var feishuActionEnabled: Bool
     public var doubaoActionEnabled: Bool
-    public var autoCheckUpdatesEnabled: Bool
     public var debugLoggingEnabled: Bool
     public var defaultPasteMode: String
     public var showDetailSource: Bool
@@ -60,16 +59,21 @@ public final class SettingsModel {
     public var showDetailSize: Bool
     public var showDetailFormatting: Bool
     public private(set) var isAccessibilityTrusted = false
+    public private(set) var runtimeErrorMessage: String?
+    public let diagnosticLogURL: URL?
+    public private(set) var isDiagnosticLogAvailable = false
 
     @ObservationIgnored private let store: any SettingsStoring
     @ObservationIgnored private let permissions: any PermissionStatusProviding
 
     public init(
         store: any SettingsStoring = UserDefaults.standard,
-        permissions: any PermissionStatusProviding = SystemPermissionStatus()
+        permissions: any PermissionStatusProviding = SystemPermissionStatus(),
+        diagnosticLogURL: URL? = nil
     ) {
         self.store = store
         self.permissions = permissions
+        self.diagnosticLogURL = diagnosticLogURL
 
         shortcut = HotKeyShortcut(
             rawValue: store.string(forKey: "showPanelHotKey") ?? ""
@@ -97,8 +101,6 @@ public final class SettingsModel {
         browserTabManagementEnabled = store.bool(forKey: "browserTabManagementEnabled")
         feishuActionEnabled = store.bool(forKey: "feishuActionEnabled")
         doubaoActionEnabled = store.bool(forKey: "doubaoActionEnabled")
-        autoCheckUpdatesEnabled = store.containsValue(forKey: "autoCheckUpdatesEnabled")
-            ? store.bool(forKey: "autoCheckUpdatesEnabled") : true
         debugLoggingEnabled = store.bool(forKey: "debugLoggingEnabled")
         defaultPasteMode = store.string(forKey: "defaultPasteMode") ?? "original"
         showDetailSource = store.containsValue(forKey: "showDetailSource")
@@ -134,7 +136,6 @@ public final class SettingsModel {
         store.set(browserTabManagementEnabled, forKey: "browserTabManagementEnabled")
         store.set(feishuActionEnabled, forKey: "feishuActionEnabled")
         store.set(doubaoActionEnabled, forKey: "doubaoActionEnabled")
-        store.set(autoCheckUpdatesEnabled, forKey: "autoCheckUpdatesEnabled")
         store.set(debugLoggingEnabled, forKey: "debugLoggingEnabled")
         store.set(defaultPasteMode, forKey: "defaultPasteMode")
         store.set(showDetailSource, forKey: "showDetailSource")
@@ -147,6 +148,24 @@ public final class SettingsModel {
 
     public func refreshPermissions() async {
         isAccessibilityTrusted = permissions.isAccessibilityTrusted()
+    }
+
+    public func reportRuntimeError(_ message: String) {
+        runtimeErrorMessage = message
+    }
+
+    public func clearRuntimeError() {
+        runtimeErrorMessage = nil
+    }
+
+    public func refreshDiagnostics() {
+        guard let diagnosticLogURL else {
+            isDiagnosticLogAvailable = false
+            return
+        }
+        isDiagnosticLogAvailable = FileManager.default.fileExists(
+            atPath: diagnosticLogURL.path
+        )
     }
 
     public var runtimeSnapshot: AppSettingsRuntimeSnapshot {
