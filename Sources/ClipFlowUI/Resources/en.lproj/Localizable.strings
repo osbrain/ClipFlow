@@ -18,6 +18,7 @@
 "menu.status.recent" = "RECENT CLIPBOARD";
 "menu.status.empty" = "No recent clipboard items";
 "menu.status.recentItem" = "%@ — %@ · %@";
+"menu.status.shortcut" = "Show panel shortcut: %@";
 "onboarding.subtitle" = "Clipboard history stays encrypted on this Mac.";
 "onboarding.localEncryption" = "Local Encryption";
 "onboarding.enabled" = "Enabled";

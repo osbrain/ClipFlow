@@ -1,5 +1,5 @@
-"app.name" = "ClipFlow";
-"app.startup.error.title" = "ClipFlow 无法启动";
+"app.name" = "拾笺";
+"app.startup.error.title" = "拾笺无法启动";
 "app.privacy.subtitle" = "剪贴板历史已加密保存在这台 Mac 上";
 "header.pasteTarget" = "粘贴目标";
 "header.clipboardTarget" = "系统剪贴板";
@@ -9,15 +9,16 @@
 "rename.title.placeholder" = "标题";
 "delete.confirmation.message" = "这会从本机删除该条目及其加密内容。";
 "category.name.placeholder" = "分类名称";
-"menu.show" = "显示 ClipFlow";
+"menu.show" = "显示主控面板";
 "menu.settings" = "设置…";
-"menu.quit" = "退出 ClipFlow";
+"menu.quit" = "退出拾笺";
 "menu.status.records" = "%ld 条剪贴板记录";
 "menu.status.encrypted" = "已加密保存在本机";
 "menu.status.destination" = "粘贴目标：%@";
 "menu.status.recent" = "最近复制";
 "menu.status.empty" = "暂无最近剪贴板内容";
 "menu.status.recentItem" = "%@ — %@ · %@";
+"menu.status.shortcut" = "唤起面板快捷键：%@";
 "onboarding.subtitle" = "剪贴板历史会加密保存在这台 Mac 上。";
 "onboarding.localEncryption" = "本地加密";
 "onboarding.enabled" = "已启用";
@@ -105,7 +106,7 @@
 "browser.status.notAuthorized" = "需要授权";
 "browser.status.authorized" = "已连接";
 "settings.title" = "设置";
-"settings.window.title" = "ClipFlow 设置";
+"settings.window.title" = "拾笺设置";
 "settings.subtitle" = "偏好、授权与诊断";
 "settings.general" = "通用";
 "settings.language" = "语言";

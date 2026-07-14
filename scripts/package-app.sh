@@ -38,13 +38,17 @@ trap '/bin/rm -rf "$STAGING_ROOT"' EXIT
 
 /bin/mkdir -p \
     "$STAGING_APP/Contents/MacOS" \
-    "$STAGING_APP/Contents/Resources"
+    "$STAGING_APP/Contents/Resources" \
+    "$STAGING_APP/Contents/Resources/zh-Hans.lproj"
 /usr/bin/ditto "$REPO_ROOT/Config/Info.plist" "$STAGING_APP/Contents/Info.plist"
 /usr/bin/ditto "$SOURCE_EXECUTABLE" "$STAGING_APP/Contents/MacOS/ClipFlowApp"
 /bin/chmod 755 "$STAGING_APP/Contents/MacOS/ClipFlowApp"
 /usr/bin/ditto \
     "$SOURCE_RESOURCE_BUNDLE" \
     "$STAGING_APP/Contents/Resources/ClipFlow_ClipFlowUI.bundle"
+/usr/bin/ditto \
+    "$REPO_ROOT/Config/zh-Hans.lproj/InfoPlist.strings" \
+    "$STAGING_APP/Contents/Resources/zh-Hans.lproj/InfoPlist.strings"
 /usr/bin/printf 'APPL????' > "$STAGING_APP/Contents/PkgInfo"
 
 /usr/bin/codesign \

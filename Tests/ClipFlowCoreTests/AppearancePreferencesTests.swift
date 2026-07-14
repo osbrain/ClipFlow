@@ -20,6 +20,16 @@ struct AppearancePreferencesTests {
     @Test("localized strings load for an explicit locale")
     func localizedStrings() {
         #expect(L10n.string("app.name", locale: "en") == "ClipFlow")
+        #expect(L10n.string("app.name", locale: "zh-Hans") == "拾笺")
+        #expect(
+            L10n.string("menu.show", locale: "zh-Hans") == "显示主控面板"
+        )
+        #expect(
+            String(
+                format: L10n.string("menu.status.shortcut", locale: "zh-Hans"),
+                "⌘⇧V"
+            ) == "唤起面板快捷键：⌘⇧V"
+        )
         #expect(L10n.string("settings.title", locale: "zh-Hans") == "设置")
         #expect(L10n.string("history.search.placeholder", locale: "zh-Hans").contains("搜索"))
     }

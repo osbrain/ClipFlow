@@ -460,6 +460,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 symbolName: "lock.shield.fill"
             )
         )
+        if let shortcut = settingsModel?.shortcut {
+            menu.addItem(
+                informationalMenuItem(
+                    title: L10n.format(
+                        "menu.status.shortcut",
+                        L10n.string("settings.shortcut.\(shortcut.rawValue)")
+                    ),
+                    symbolName: "keyboard"
+                )
+            )
+        }
         menu.addItem(
             informationalMenuItem(
                 title: L10n.format("menu.status.records", presentation.recordCount)
