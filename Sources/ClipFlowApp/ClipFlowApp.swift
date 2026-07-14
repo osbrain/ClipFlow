@@ -23,6 +23,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var hotKeyController: GlobalHotKeyController?
     private var monitor: PasteboardMonitor?
     private var pasteService: AppPasteService?
+    private var settingsCoordinator: AppSettingsCoordinator?
+    private var logger: LocalLogger?
     private var statusItem: NSStatusItem?
     private var settingsWindow: NSWindowController?
     private var settingsModel: SettingsModel?
@@ -56,6 +58,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             )
             let settings = SettingsModel(store: runtimeDefaults)
             L10n.configure(language: settings.appLanguage)
+            let logger = LocalLogger(
+                fileURL: support.appendingPathComponent("ClipFlow.log"),
+                enabled: settings.debugLoggingEnabled
+            )
             let keyData = try Self.databaseKey(applicationSupport: support)
             let database = try SQLCipherDatabase(
                 url: support.appendingPathComponent("ClipFlow.sqlite"),
@@ -98,6 +104,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 }
             }
             #endif
+            let retentionPolicyStore = AppRetentionPolicyStore(
+                policy: settings.runtimeSnapshot.retention.policy
+            )
+            let startupDeleted = try repository.applyRetention(retentionPolicyStore.current())
+            Task {
+                await logger.log("startup")
+                await logger.log(
+                    "retention_cleanup",
+                    metadata: ["deletedCount": "\(startupDeleted.count)"]
+                )
+            }
             let clipboard = SystemClipboard()
             let coordinator = PasteCoordinator(
                 writer: clipboard,
@@ -180,6 +197,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                         do {
                             let normalized = try clipboardNormalizer.normalize(capture)
                             _ = try repository.upsert(normalized)
+                            let deleted = try repository.applyRetention(
+                                retentionPolicyStore.current()
+                            )
+                            await logger.log(
+                                "capture",
+                                metadata: [
+                                    "kind": normalized.kind.rawValue,
+                                    "byteCount": "\(normalized.byteSize)"
+                                ]
+                            )
+                            if !deleted.isEmpty {
+                                await logger.log(
+                                    "retention_cleanup",
+                                    metadata: ["deletedCount": "\(deleted.count)"]
+                                )
+                            }
                             await model.reload()
                         } catch ClipboardNormalizationError.noUsablePayload {
                             return
@@ -198,7 +231,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             self.monitor = pasteboardMonitor
             self.pasteService = pasteService
             self.settingsModel = settings
-            createStatusItem()
+            self.logger = logger
+            self.settingsCoordinator = AppSettingsCoordinator(
+                repository: repository,
+                pasteService: pasteService,
+                logger: logger,
+                retentionPolicyStore: retentionPolicyStore,
+                updateShortcut: { [weak self] shortcut, previous in
+                    try self?.replaceShortcut(shortcut, restoring: previous)
+                },
+                updateStatusItem: { [weak self] enabled in
+                    self?.updateStatusItem(enabled: enabled)
+                },
+                updateLanguage: { [weak self] language in
+                    self?.updateLanguage(language)
+                }
+            )
+            updateStatusItem(enabled: settings.showStatusBarItem)
             capturePasteTarget()
             if let visualAcceptanceConfiguration {
                 try Self.writeVisualAcceptanceReadyFile(
@@ -346,6 +395,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func createStatusItem() {
         guard settingsModel?.showStatusBarItem != false else { return }
+        guard statusItem == nil else { return }
         let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         item.button?.image = NSImage(
             systemSymbolName: "doc.on.clipboard",
@@ -378,6 +428,38 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         statusItem = item
     }
 
+    private func updateStatusItem(enabled: Bool) {
+        if let statusItem {
+            NSStatusBar.system.removeStatusItem(statusItem)
+            self.statusItem = nil
+        }
+        if enabled {
+            createStatusItem()
+        }
+    }
+
+    private func replaceShortcut(
+        _ shortcut: HotKeyShortcut,
+        restoring previous: HotKeyShortcut
+    ) throws {
+        guard let hotKeyController else { return }
+        do {
+            try hotKeyController.register(shortcut: shortcut) { [weak self] in
+                self?.togglePanel()
+            }
+        } catch {
+            try? hotKeyController.register(shortcut: previous) { [weak self] in
+                self?.togglePanel()
+            }
+            throw error
+        }
+    }
+
+    private func updateLanguage(_ language: AppLanguage) {
+        L10n.configure(language: language)
+        settingsWindow?.window?.title = L10n.string("settings.window.title")
+    }
+
     @objc private func showPanelFromMenu() {
         if panelController?.window?.isVisible != true {
             capturePasteTarget()
@@ -407,7 +489,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         window.contentView = NSHostingView(
             rootView: SettingsWindowRootView(
                 model: settingsModel,
-                loginItemService: loginItemService
+                loginItemService: loginItemService,
+                onRuntimeSettingsChange: { [weak self, weak settingsModel] previous, current in
+                    Task { @MainActor in
+                        do {
+                            try await self?.settingsCoordinator?.apply(
+                                previous: previous,
+                                current: current
+                            )
+                        } catch {
+                            await self?.logger?.log(
+                                "settings_application_error",
+                                metadata: ["errorType": String(describing: type(of: error))]
+                            )
+                            settingsModel?.save()
+                        }
+                    }
+                }
             )
         )
         let controller = NSWindowController(window: window)
@@ -532,9 +630,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 private struct SettingsWindowRootView: View {
     @Bindable var model: SettingsModel
     let loginItemService: LoginItemService
+    let onRuntimeSettingsChange: @MainActor (
+        AppSettingsRuntimeSnapshot,
+        AppSettingsRuntimeSnapshot
+    ) -> Void
 
     var body: some View {
-        SettingsView(model: model, loginItemService: loginItemService)
+        SettingsView(
+            model: model,
+            loginItemService: loginItemService,
+            onRuntimeSettingsChange: onRuntimeSettingsChange
+        )
             .preferredColorScheme(model.appearanceMode.colorScheme)
             .id(model.appLanguage)
             .environment(\.locale, L10n.locale)

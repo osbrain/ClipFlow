@@ -42,6 +42,19 @@ struct PasteModeResolverTests {
         #expect(resolver.mode(for: "com.apple.Terminal") == .plainText)
         #expect(resolver.mode(for: "com.apple.TextEdit") == .original)
     }
+
+    @Test("default paste mode can change without losing application overrides")
+    func updatesDefaultModeAtRuntime() {
+        let resolver = PasteModeResolver(
+            defaultMode: .original,
+            overrides: ["com.apple.Terminal": .plainText]
+        )
+
+        resolver.updateDefaultMode(.plainText)
+
+        #expect(resolver.mode(for: "com.apple.TextEdit") == .plainText)
+        #expect(resolver.mode(for: "com.apple.Terminal") == .plainText)
+    }
 }
 
 @Suite("Paste coordination")

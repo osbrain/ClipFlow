@@ -1,4 +1,5 @@
 import ApplicationServices
+import ClipFlowCore
 import ClipFlowSystem
 import Foundation
 import Observation
@@ -146,5 +147,21 @@ public final class SettingsModel {
 
     public func refreshPermissions() async {
         isAccessibilityTrusted = permissions.isAccessibilityTrusted()
+    }
+
+    public var runtimeSnapshot: AppSettingsRuntimeSnapshot {
+        AppSettingsRuntimeSnapshot(
+            shortcut: shortcut,
+            showStatusBarItem: showStatusBarItem,
+            appLanguage: appLanguage,
+            defaultPasteMode: PasteMode(rawValue: defaultPasteMode) ?? .original,
+            externalPayloadThresholdMB: externalPayloadThresholdMB,
+            retention: RetentionSettings(
+                preference: retention,
+                maximumItemCount: maximumItemCount,
+                maximumStorageMB: maximumStorageMB
+            ),
+            debugLoggingEnabled: debugLoggingEnabled
+        )
     }
 }

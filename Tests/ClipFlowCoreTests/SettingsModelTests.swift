@@ -1,5 +1,7 @@
 import Foundation
 import Testing
+import ClipFlowCore
+import ClipFlowSystem
 @testable import ClipFlowUI
 
 @Suite("Settings model")
@@ -124,6 +126,46 @@ struct SettingsModelTests {
             SettingsModel(store: store, permissions: permissions).appLanguage ==
                 .simplifiedChinese
         )
+    }
+
+    @Test("runtime settings detect every live service change independently")
+    func runtimeSettingsDetectIndependentChanges() {
+        let baseline = AppSettingsRuntimeSnapshot(
+            shortcut: .commandShiftV,
+            showStatusBarItem: true,
+            appLanguage: .system,
+            defaultPasteMode: .original,
+            externalPayloadThresholdMB: 4,
+            retention: RetentionSettings(
+                preference: .month,
+                maximumItemCount: 10_000,
+                maximumStorageMB: 2_048
+            ),
+            debugLoggingEnabled: false
+        )
+        let cases: [(AppSettingsRuntimeSnapshot, AppSettingsRuntimeChange)] = [
+            (.init(copying: baseline, shortcut: .optionCommandV), .shortcut),
+            (.init(copying: baseline, showStatusBarItem: false), .statusItem),
+            (.init(copying: baseline, appLanguage: .simplifiedChinese), .language),
+            (.init(copying: baseline, defaultPasteMode: .plainText), .pasteMode),
+            (.init(copying: baseline, externalPayloadThresholdMB: 8), .externalPayloadThreshold),
+            (
+                .init(
+                    copying: baseline,
+                    retention: RetentionSettings(
+                        preference: .week,
+                        maximumItemCount: 10_000,
+                        maximumStorageMB: 2_048
+                    )
+                ),
+                .retention
+            ),
+            (.init(copying: baseline, debugLoggingEnabled: true), .debugLogging)
+        ]
+
+        for (snapshot, expected) in cases {
+            #expect(snapshot.changes(from: baseline) == [expected])
+        }
     }
 }
 

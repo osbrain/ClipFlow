@@ -1,14 +1,27 @@
 import AppKit
+import ClipFlowCore
 import ClipFlowSystem
 import SwiftUI
 
 public struct SettingsView: View {
     @Bindable private var model: SettingsModel
     private let loginItemService: LoginItemService
+    private let onRuntimeSettingsChange: @MainActor (
+        AppSettingsRuntimeSnapshot,
+        AppSettingsRuntimeSnapshot
+    ) -> Void
 
-    public init(model: SettingsModel, loginItemService: LoginItemService) {
+    public init(
+        model: SettingsModel,
+        loginItemService: LoginItemService,
+        onRuntimeSettingsChange: @escaping @MainActor (
+            AppSettingsRuntimeSnapshot,
+            AppSettingsRuntimeSnapshot
+        ) -> Void = { _, _ in }
+    ) {
         self.model = model
         self.loginItemService = loginItemService
+        self.onRuntimeSettingsChange = onRuntimeSettingsChange
     }
 
     public var body: some View {
@@ -27,7 +40,10 @@ public struct SettingsView: View {
         .background(Color(nsColor: .windowBackgroundColor))
         .id(model.appLanguage)
         .environment(\.locale, L10n.locale)
-        .onChange(of: snapshot) { model.save() }
+        .onChange(of: snapshot) { previous, current in
+            model.save()
+            onRuntimeSettingsChange(previous.runtimeSnapshot, current.runtimeSnapshot)
+        }
         .task { await model.refreshPermissions() }
     }
 
@@ -389,6 +405,22 @@ private struct SettingsSnapshot: Equatable {
     let debugLoggingEnabled: Bool
     let defaultPasteMode: String
     let detailFlags: [Bool]
+
+    var runtimeSnapshot: AppSettingsRuntimeSnapshot {
+        AppSettingsRuntimeSnapshot(
+            shortcut: shortcut,
+            showStatusBarItem: showStatusBarItem,
+            appLanguage: appLanguage,
+            defaultPasteMode: PasteMode(rawValue: defaultPasteMode) ?? .original,
+            externalPayloadThresholdMB: externalPayloadThresholdMB,
+            retention: RetentionSettings(
+                preference: retention,
+                maximumItemCount: maximumItemCount,
+                maximumStorageMB: maximumStorageMB
+            ),
+            debugLoggingEnabled: debugLoggingEnabled
+        )
+    }
 }
 
 private extension HotKeyShortcut {

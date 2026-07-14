@@ -24,6 +24,14 @@ actor AppPasteService: PasteServing {
         self.target = target
     }
 
+    func updateDefaultMode(_ mode: PasteMode) {
+        modeResolver.updateDefaultMode(mode)
+    }
+
+    func resolvedMode(for bundleID: String?) -> PasteMode {
+        modeResolver.mode(for: bundleID)
+    }
+
     func paste(item: ClipboardItem) async throws -> PasteOutcome {
         guard let target else { throw AppPasteServiceError.noTargetApplication }
         return try await paste(

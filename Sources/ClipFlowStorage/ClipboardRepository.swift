@@ -11,7 +11,8 @@ public struct RepositoryPayload: Equatable, Sendable {
 public final class ClipboardRepository: @unchecked Sendable {
     private let database: SQLCipherDatabase
     private let externalPayloadStore: ExternalPayloadStore
-    private let externalThresholdBytes: Int
+    private let configurationLock = NSLock()
+    private var configuredExternalThresholdBytes: Int
 
     public init(
         database: SQLCipherDatabase,
@@ -20,8 +21,14 @@ public final class ClipboardRepository: @unchecked Sendable {
     ) throws {
         self.database = database
         self.externalPayloadStore = externalPayloadStore
-        self.externalThresholdBytes = max(1, externalThresholdBytes)
+        self.configuredExternalThresholdBytes = max(1, externalThresholdBytes)
         try Migrations.apply(to: database)
+    }
+
+    public func updateExternalPayloadThreshold(bytes: Int) {
+        configurationLock.withLock {
+            configuredExternalThresholdBytes = max(1, bytes)
+        }
     }
 
     public func upsert(
@@ -29,6 +36,9 @@ public final class ClipboardRepository: @unchecked Sendable {
         itemID: UUID? = nil,
         timestamp: Date = Date()
     ) throws -> ClipboardItem {
+        let externalThresholdBytes = configurationLock.withLock {
+            configuredExternalThresholdBytes
+        }
         let existing = try database.query(
             "SELECT id, created_at, is_favorite, last_used_at, custom_title FROM clipboard_items WHERE content_hash = ?;",
             bindings: [.text(capture.contentHash)]
@@ -233,6 +243,40 @@ public final class ClipboardRepository: @unchecked Sendable {
         for reference in references {
             try? externalPayloadStore.delete(reference)
         }
+    }
+
+    public func retentionCandidates() throws -> [RetentionCandidate] {
+        try database.query(
+            """
+            SELECT id, COALESCE(last_used_at, updated_at) AS retention_timestamp,
+                   byte_size, is_favorite
+            FROM clipboard_items;
+            """
+        ).compactMap { row in
+            guard let id = row.uuid("id"),
+                  let timestamp = row.date("retention_timestamp"),
+                  let byteSize = row.integer("byte_size") else {
+                return nil
+            }
+            return RetentionCandidate(
+                id: id,
+                timestamp: timestamp,
+                byteSize: Int(byteSize),
+                isFavorite: row.bool("is_favorite") ?? false
+            )
+        }
+    }
+
+    @discardableResult
+    public func applyRetention(
+        _ policy: RetentionPolicy,
+        now: Date = Date()
+    ) throws -> [UUID] {
+        let itemIDs = policy.cleanupCandidates(try retentionCandidates(), now: now)
+        for id in itemIDs {
+            try delete(id)
+        }
+        return itemIDs
     }
 
     public func createCategory(name: String) throws -> ClipCategory {

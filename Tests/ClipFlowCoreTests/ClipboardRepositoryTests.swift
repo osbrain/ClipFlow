@@ -142,13 +142,58 @@ struct ClipboardRepositoryTests {
         #expect(repaired.contentHash == "legacy-finder-hash")
         #expect(try harness.repository.categories(for: itemID).map(\.id) == [category.id])
     }
+
+    @Test("updates the external payload threshold for future writes")
+    func updatesExternalPayloadThreshold() throws {
+        let harness = try RepositoryHarness(externalThresholdBytes: 1_000)
+        defer { harness.cleanup() }
+
+        harness.repository.updateExternalPayloadThreshold(bytes: 16)
+        let item = try harness.repository.upsert(
+            harness.dataCapture(hash: "threshold", byteCount: 16)
+        )
+
+        #expect(item.hasExternalPayload)
+        #expect(try harness.repository.payloads(for: item.id).first?.data.count == 16)
+    }
+
+    @Test("retention deletes oldest non-favorites and their external payloads")
+    func appliesRetentionAndCleansExternalPayloads() throws {
+        let harness = try RepositoryHarness(externalThresholdBytes: 1)
+        defer { harness.cleanup() }
+        let base = Date(timeIntervalSince1970: 1_700_000_000)
+        let favorite = try harness.repository.upsert(
+            harness.dataCapture(hash: "favorite", byteCount: 32),
+            timestamp: base
+        )
+        try harness.repository.setFavorite(true, for: favorite.id)
+        let oldest = try harness.repository.upsert(
+            harness.dataCapture(hash: "oldest", byteCount: 32),
+            timestamp: base.addingTimeInterval(10)
+        )
+        let newest = try harness.repository.upsert(
+            harness.dataCapture(hash: "newest", byteCount: 32),
+            timestamp: base.addingTimeInterval(20)
+        )
+
+        let deleted = try harness.repository.applyRetention(
+            RetentionPolicy(maxAge: nil, maxItemCount: 2, maxBytes: nil),
+            now: base.addingTimeInterval(30)
+        )
+
+        #expect(deleted == [oldest.id])
+        #expect(try harness.repository.item(id: oldest.id) == nil)
+        #expect(try harness.repository.item(id: favorite.id) != nil)
+        #expect(try harness.repository.item(id: newest.id) != nil)
+        #expect(try harness.externalPayloadFileCount() == 2)
+    }
 }
 
 private final class RepositoryHarness {
     let root: URL
     let repository: ClipboardRepository
 
-    init() throws {
+    init(externalThresholdBytes: Int = 1_000) throws {
         root = FileManager.default.temporaryDirectory
             .appendingPathComponent(UUID().uuidString, isDirectory: true)
         let database = try SQLCipherDatabase(
@@ -162,7 +207,7 @@ private final class RepositoryHarness {
         repository = try ClipboardRepository(
             database: database,
             externalPayloadStore: payloadStore,
-            externalThresholdBytes: 1_000
+            externalThresholdBytes: externalThresholdBytes
         )
     }
 
@@ -183,6 +228,34 @@ private final class RepositoryHarness {
                 )
             ]
         )
+    }
+
+    func dataCapture(hash: String, byteCount: Int) -> NormalizedCapture {
+        NormalizedCapture(
+            sourceAppName: "Test",
+            sourceBundleID: nil,
+            kind: .unknown,
+            previewText: "Binary data",
+            searchText: "binary data",
+            byteSize: byteCount,
+            contentHash: hash,
+            payloads: [
+                NormalizedPayload(
+                    itemIndex: 0,
+                    type: "public.data",
+                    data: Data(repeating: 0x55, count: byteCount)
+                )
+            ]
+        )
+    }
+
+    func externalPayloadFileCount() throws -> Int {
+        let directory = root.appendingPathComponent("Payloads", isDirectory: true)
+        guard FileManager.default.fileExists(atPath: directory.path) else { return 0 }
+        return try FileManager.default.contentsOfDirectory(
+            at: directory,
+            includingPropertiesForKeys: nil
+        ).count
     }
 
     func cleanup() {

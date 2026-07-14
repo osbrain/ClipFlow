@@ -18,8 +18,12 @@ public actor LocalLogger {
     public func log(_ event: String, metadata: [String: String] = [:]) async {
         guard enabled else { return }
 
+        let sensitiveKeyFragments = [
+            "content", "text", "payload", "clipboard", "url", "path", "search"
+        ]
         let safeMetadata = metadata.filter { key, _ in
-            !["content", "text", "payload", "clipboard"].contains(key.lowercased())
+            let normalizedKey = key.lowercased()
+            return !sensitiveKeyFragments.contains(where: normalizedKey.contains)
         }
         let record: [String: Any] = [
             "timestamp": ISO8601DateFormatter().string(from: Date()),
@@ -61,4 +65,3 @@ public actor LocalLogger {
         }
     }
 }
-
