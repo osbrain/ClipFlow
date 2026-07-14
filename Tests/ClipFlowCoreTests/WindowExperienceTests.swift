@@ -38,7 +38,7 @@ struct WindowExperienceTests {
         )
     }
 
-    @Test("settings content reserves the native title bar layout area")
+    @Test("settings window uses an opaque native title bar outside its content layout")
     func settingsWindowAppearance() {
         let window = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: 640, height: 700),
@@ -50,9 +50,9 @@ struct WindowExperienceTests {
         SettingsWindowAppearance.apply(to: window)
 
         #expect(!window.styleMask.contains(.fullSizeContentView))
-        #expect(window.titlebarAppearsTransparent)
-        #expect(!window.isOpaque)
-        #expect(window.backgroundColor == .clear)
+        #expect(!window.titlebarAppearsTransparent)
+        #expect(window.isOpaque)
+        #expect(window.backgroundColor == .windowBackgroundColor)
     }
 
     @Test("overlay scroll indicators stay four points thick in both orientations")
