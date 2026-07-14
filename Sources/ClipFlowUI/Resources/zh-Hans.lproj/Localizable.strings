@@ -100,6 +100,10 @@
 "settings.window.title" = "ClipFlow 设置";
 "settings.subtitle" = "偏好、授权和更新";
 "settings.general" = "通用";
+"settings.language" = "语言";
+"settings.language.system" = "跟随系统";
+"settings.language.simplifiedChinese" = "简体中文";
+"settings.language.english" = "English";
 "settings.retention" = "保留与存储";
 "settings.permissions" = "权限与集成";
 "settings.startup" = "启动与更新";

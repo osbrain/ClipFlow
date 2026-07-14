@@ -32,6 +32,7 @@ public struct ClipFlowRootView: View {
     public var body: some View {
         rootContent
             .preferredColorScheme(settings.appearanceMode.colorScheme)
+            .id(settings.appLanguage)
             .environment(\.locale, L10n.locale)
     }
 

@@ -55,6 +55,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 visualAcceptanceConfiguration: visualAcceptanceConfiguration
             )
             let settings = SettingsModel(store: runtimeDefaults)
+            L10n.configure(language: settings.appLanguage)
             let keyData = try Self.databaseKey(applicationSupport: support)
             let database = try SQLCipherDatabase(
                 url: support.appendingPathComponent("ClipFlow.sqlite"),
@@ -535,6 +536,7 @@ private struct SettingsWindowRootView: View {
     var body: some View {
         SettingsView(model: model, loginItemService: loginItemService)
             .preferredColorScheme(model.appearanceMode.colorScheme)
+            .id(model.appLanguage)
             .environment(\.locale, L10n.locale)
     }
 }

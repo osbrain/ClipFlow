@@ -107,7 +107,11 @@ struct ClipboardKindPresentationTests {
             "contextAction.openLink",
             "contextAction.openFile",
             "contextAction.revealInFinder",
-            "contextAction.quickLook"
+            "contextAction.quickLook",
+            "settings.language",
+            "settings.language.system",
+            "settings.language.simplifiedChinese",
+            "settings.language.english"
         ]
 
         for key in keys {

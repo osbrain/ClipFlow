@@ -108,6 +108,23 @@ struct SettingsModelTests {
         #expect(restored.appearanceMode == .dark)
         #expect(restored.listDensity == .compact)
     }
+
+    @Test("persists an explicit application language")
+    func persistsApplicationLanguage() {
+        let store = MemorySettingsStore()
+        let permissions = FakePermissionStatus(accessibilityTrusted: false)
+        let model = SettingsModel(store: store, permissions: permissions)
+
+        #expect(model.appLanguage == .system)
+        model.appLanguage = .simplifiedChinese
+        model.save()
+
+        #expect(store.string(forKey: "appLanguage") == "zh-Hans")
+        #expect(
+            SettingsModel(store: store, permissions: permissions).appLanguage ==
+                .simplifiedChinese
+        )
+    }
 }
 
 private final class MemorySettingsStore: SettingsStoring, @unchecked Sendable {

@@ -23,4 +23,19 @@ struct AppearancePreferencesTests {
         #expect(L10n.string("settings.title", locale: "zh-Hans") == "设置")
         #expect(L10n.string("history.search.placeholder", locale: "zh-Hans").contains("搜索"))
     }
+
+    @Test("application languages have stable values and select explicit resources")
+    func applicationLanguages() {
+        #expect(AppLanguage.allCases == [.system, .simplifiedChinese, .english])
+        #expect(AppLanguage.system.localeIdentifier == nil)
+        #expect(AppLanguage.simplifiedChinese.localeIdentifier == "zh-Hans")
+        #expect(AppLanguage.english.localeIdentifier == "en")
+
+        #expect(
+            L10n.string("settings.title", language: .simplifiedChinese) == "设置"
+        )
+        #expect(L10n.locale(for: .simplifiedChinese).identifier.hasPrefix("zh"))
+        #expect(L10n.string("settings.title", language: .english) == "Settings")
+        #expect(L10n.locale(for: .english).identifier.hasPrefix("en"))
+    }
 }

@@ -25,6 +25,8 @@ public struct SettingsView: View {
             .padding(18)
         }
         .background(Color(nsColor: .windowBackgroundColor))
+        .id(model.appLanguage)
+        .environment(\.locale, L10n.locale)
         .onChange(of: snapshot) { model.save() }
         .task { await model.refreshPermissions() }
     }
@@ -55,6 +57,16 @@ public struct SettingsView: View {
                 ) {
                     ForEach(ClipFlowAppearanceMode.allCases, id: \.self) { appearance in
                         Text(L10n.string(appearance.localizationKey)).tag(appearance)
+                    }
+                }
+
+                menuRow(
+                    icon: "globe",
+                    title: L10n.string("settings.language"),
+                    selection: languageBinding
+                ) {
+                    ForEach(AppLanguage.allCases, id: \.self) { language in
+                        Text(L10n.string(language.localizationKey)).tag(language)
                     }
                 }
 
@@ -289,6 +301,7 @@ public struct SettingsView: View {
             shortcut: model.shortcut,
             appearanceMode: model.appearanceMode,
             listDensity: model.listDensity,
+            appLanguage: model.appLanguage,
             launchAtLogin: model.launchAtLogin,
             showStatusBarItem: model.showStatusBarItem,
             retention: model.retention,
@@ -306,6 +319,16 @@ public struct SettingsView: View {
                 model.showDetailCreatedAt, model.showDetailLastUsedAt,
                 model.showDetailSize, model.showDetailFormatting
             ]
+        )
+    }
+
+    private var languageBinding: Binding<AppLanguage> {
+        Binding(
+            get: { model.appLanguage },
+            set: { language in
+                L10n.configure(language: language)
+                model.appLanguage = language
+            }
         )
     }
 
@@ -352,6 +375,7 @@ private struct SettingsSnapshot: Equatable {
     let shortcut: HotKeyShortcut
     let appearanceMode: ClipFlowAppearanceMode
     let listDensity: ClipFlowListDensity
+    let appLanguage: AppLanguage
     let launchAtLogin: Bool
     let showStatusBarItem: Bool
     let retention: RetentionPreference

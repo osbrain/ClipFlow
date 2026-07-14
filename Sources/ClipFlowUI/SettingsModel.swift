@@ -39,6 +39,7 @@ public final class SettingsModel {
     public var shortcut: HotKeyShortcut
     public var appearanceMode: ClipFlowAppearanceMode
     public var listDensity: ClipFlowListDensity
+    public var appLanguage: AppLanguage
     public var launchAtLogin: Bool
     public var showStatusBarItem: Bool
     public var retention: RetentionPreference
@@ -78,6 +79,9 @@ public final class SettingsModel {
         listDensity = ClipFlowListDensity(
             rawValue: store.string(forKey: "listDensity") ?? ""
         ) ?? .comfortable
+        appLanguage = AppLanguage(
+            rawValue: store.string(forKey: "appLanguage") ?? ""
+        ) ?? .system
         launchAtLogin = store.bool(forKey: "launchAtLogin")
         showStatusBarItem = store.containsValue(forKey: "showStatusBarItem")
             ? store.bool(forKey: "showStatusBarItem") : true
@@ -119,6 +123,7 @@ public final class SettingsModel {
         store.set(shortcut.rawValue, forKey: "showPanelHotKey")
         store.set(appearanceMode.rawValue, forKey: "appearanceMode")
         store.set(listDensity.rawValue, forKey: "listDensity")
+        store.set(appLanguage.rawValue, forKey: "appLanguage")
         store.set(launchAtLogin, forKey: "launchAtLogin")
         store.set(showStatusBarItem, forKey: "showStatusBarItem")
         store.set(retention.rawValue, forKey: "retentionPolicy")
