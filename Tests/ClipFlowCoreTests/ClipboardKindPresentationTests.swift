@@ -120,7 +120,13 @@ struct ClipboardKindPresentationTests {
             "settings.logNotCreated",
             "settings.revealLog",
             "header.pasteTarget",
-            "header.clipboardTarget"
+            "header.clipboardTarget",
+            "menu.status.records",
+            "menu.status.encrypted",
+            "menu.status.destination",
+            "menu.status.recent",
+            "menu.status.empty",
+            "menu.status.recentItem"
         ]
 
         for key in keys {

@@ -12,6 +12,12 @@
 "menu.show" = "Show ClipFlow";
 "menu.settings" = "Settings…";
 "menu.quit" = "Quit ClipFlow";
+"menu.status.records" = "%ld clipboard records";
+"menu.status.encrypted" = "Encrypted on this Mac";
+"menu.status.destination" = "Paste target: %@";
+"menu.status.recent" = "RECENT CLIPBOARD";
+"menu.status.empty" = "No recent clipboard items";
+"menu.status.recentItem" = "%@ — %@ · %@";
 "onboarding.subtitle" = "Clipboard history stays encrypted on this Mac.";
 "onboarding.localEncryption" = "Local Encryption";
 "onboarding.enabled" = "Enabled";

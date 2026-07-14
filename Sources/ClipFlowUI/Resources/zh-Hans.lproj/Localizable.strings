@@ -12,6 +12,12 @@
 "menu.show" = "显示 ClipFlow";
 "menu.settings" = "设置…";
 "menu.quit" = "退出 ClipFlow";
+"menu.status.records" = "%ld 条剪贴板记录";
+"menu.status.encrypted" = "已加密保存在本机";
+"menu.status.destination" = "粘贴目标：%@";
+"menu.status.recent" = "最近复制";
+"menu.status.empty" = "暂无最近剪贴板内容";
+"menu.status.recentItem" = "%@ — %@ · %@";
 "onboarding.subtitle" = "剪贴板历史会加密保存在这台 Mac 上。";
 "onboarding.localEncryption" = "本地加密";
 "onboarding.enabled" = "已启用";

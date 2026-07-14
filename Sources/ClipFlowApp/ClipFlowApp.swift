@@ -18,7 +18,7 @@ struct ClipFlowApp: App {
 }
 
 @MainActor
-final class AppDelegate: NSObject, NSApplicationDelegate {
+final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var panelController: FloatingPanelController?
     private var hotKeyController: GlobalHotKeyController?
     private var monitor: PasteboardMonitor?
@@ -29,6 +29,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var settingsWindow: NSWindowController?
     private var settingsModel: SettingsModel?
     private var appModel: AppModel?
+    private var historyRepository: (any HistoryRepository)?
     private var isRestoringRuntimeSettings = false
     private let loginItemService = LoginItemService()
 
@@ -251,6 +252,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             self.pasteService = pasteService
             self.settingsModel = settings
             self.appModel = model
+            self.historyRepository = repository
             self.logger = logger
             self.settingsCoordinator = AppSettingsCoordinator(
                 repository: repository,
@@ -433,21 +435,105 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             accessibilityDescription: L10n.string("app.name")
         )
         let menu = NSMenu()
+        menu.delegate = self
+        item.menu = menu
+        statusItem = item
+    }
+
+    func menuNeedsUpdate(_ menu: NSMenu) {
+        rebuildStatusMenu(menu)
+    }
+
+    private func rebuildStatusMenu(_ menu: NSMenu) {
+        menu.removeAllItems()
+        let records = (try? historyRepository?.search(
+            SearchQuery(text: "", categoryID: nil, kind: nil, favoritesOnly: false)
+        )) ?? []
+        let presentation = StatusMenuPresentation(
+            items: records,
+            pasteDestinationName: appModel?.pasteDestinationName
+        )
+
+        menu.addItem(
+            informationalMenuItem(
+                title: L10n.string("app.name"),
+                symbolName: "lock.shield.fill"
+            )
+        )
+        menu.addItem(
+            informationalMenuItem(
+                title: L10n.format("menu.status.records", presentation.recordCount)
+                    + " · " + L10n.string("menu.status.encrypted"),
+                symbolName: "checkmark.seal.fill"
+            )
+        )
+        if let pasteDestinationName = presentation.pasteDestinationName {
+            menu.addItem(
+                informationalMenuItem(
+                    title: L10n.format("menu.status.destination", pasteDestinationName),
+                    symbolName: "arrow.right.circle"
+                )
+            )
+        }
+
+        menu.addItem(.separator())
+        menu.addItem(informationalMenuItem(title: L10n.string("menu.status.recent")))
+        if presentation.recentItems.isEmpty {
+            menu.addItem(
+                informationalMenuItem(
+                    title: L10n.string("menu.status.empty"),
+                    symbolName: "doc.on.clipboard"
+                )
+            )
+        } else {
+            for recentItem in presentation.recentItems {
+                let item = NSMenuItem(
+                    title: L10n.format(
+                        "menu.status.recentItem",
+                        recentItem.title,
+                        recentItem.sourceName,
+                        recentItem.kind.localizedDisplayName
+                    ),
+                    action: #selector(revealRecentClipboardItem),
+                    keyEquivalent: ""
+                )
+                item.target = self
+                item.image = NSImage(
+                    systemSymbolName: recentItem.symbolName,
+                    accessibilityDescription: recentItem.kind.localizedDisplayName
+                )
+                item.representedObject = recentItem.id.uuidString
+                item.toolTip = recentItem.title
+                menu.addItem(item)
+            }
+        }
+
+        menu.addItem(.separator())
         let showItem = NSMenuItem(
             title: L10n.string("menu.show"),
             action: #selector(showPanelFromMenu),
             keyEquivalent: ""
         )
         showItem.target = self
+        showItem.image = NSImage(
+            systemSymbolName: "rectangle.stack.badge.play",
+            accessibilityDescription: L10n.string("menu.show")
+        )
         menu.addItem(showItem)
+
         let settingsItem = NSMenuItem(
             title: L10n.string("menu.settings"),
             action: #selector(showSettings),
             keyEquivalent: ","
         )
         settingsItem.target = self
+        settingsItem.image = NSImage(
+            systemSymbolName: "gearshape",
+            accessibilityDescription: L10n.string("menu.settings")
+        )
         menu.addItem(settingsItem)
         menu.addItem(.separator())
+
         let quitItem = NSMenuItem(
             title: L10n.string("menu.quit"),
             action: #selector(quitApplication),
@@ -455,8 +541,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         )
         quitItem.target = self
         menu.addItem(quitItem)
-        item.menu = menu
-        statusItem = item
+    }
+
+    private func informationalMenuItem(
+        title: String,
+        symbolName: String? = nil
+    ) -> NSMenuItem {
+        let item = NSMenuItem(title: title, action: nil, keyEquivalent: "")
+        item.isEnabled = false
+        if let symbolName {
+            item.image = NSImage(
+                systemSymbolName: symbolName,
+                accessibilityDescription: nil
+            )
+        }
+        return item
     }
 
     private func updateStatusItem(enabled: Bool) {
@@ -495,6 +594,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if panelController?.window?.isVisible != true {
             capturePasteTarget()
             panelController?.show()
+        }
+    }
+
+    @objc private func revealRecentClipboardItem(_ sender: NSMenuItem) {
+        guard let identifier = sender.representedObject as? String,
+              let itemID = UUID(uuidString: identifier),
+              let appModel else {
+            return
+        }
+
+        appModel.searchText = ""
+        appModel.apply(.all)
+        Task { @MainActor [weak self, weak appModel] in
+            guard let self, let appModel else { return }
+            await appModel.reload()
+            guard appModel.items.contains(where: { $0.id == itemID }) else { return }
+            appModel.selectedItemID = itemID
+            self.capturePasteTarget()
+            self.panelController?.show()
         }
     }
 
