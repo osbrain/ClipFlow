@@ -29,11 +29,32 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let loginItemService = LoginItemService()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        #if DEBUG
+        let environment = ProcessInfo.processInfo.environment
+        let arguments = CommandLine.arguments
+        if VisualAcceptanceConfiguration.isProbe(arguments: arguments) {
+            FileHandle.standardOutput.write(
+                Data("CLIPFLOW_VISUAL_ACCEPTANCE_V1\n".utf8)
+            )
+            NSApp.terminate(nil)
+            return
+        }
+        let visualAcceptanceConfiguration = VisualAcceptanceConfiguration.validated(
+            environment: environment,
+            arguments: arguments
+        )
+        #else
+        let visualAcceptanceConfiguration: VisualAcceptanceConfiguration? = nil
+        #endif
+
         NSApp.setActivationPolicy(.accessory)
 
         do {
             let support = try Self.applicationSupportDirectory()
-            let settings = SettingsModel()
+            let runtimeDefaults = try Self.runtimeUserDefaults(
+                visualAcceptanceConfiguration: visualAcceptanceConfiguration
+            )
+            let settings = SettingsModel(store: runtimeDefaults)
             let keyData = try Self.databaseKey(applicationSupport: support)
             let database = try SQLCipherDatabase(
                 url: support.appendingPathComponent("ClipFlow.sqlite"),
@@ -49,23 +70,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 externalThresholdBytes: settings.externalPayloadThresholdMB * 1_048_576
             )
             #if DEBUG
-            if ProcessInfo.processInfo.environment["CLIPFLOW_SEED_DEMO"] == "1" {
-                let capture = RawClipboardCapture(
-                    sourceAppName: "Notes",
-                    sourceBundleID: "com.apple.Notes",
-                    items: [RawClipboardItem(representations: [
-                        RawClipboardRepresentation(
-                            type: "public.utf8-plain-text",
-                            data: Data("ClipFlow preview and drag acceptance item".utf8)
-                        )
-                    ])]
+            if environment["CLIPFLOW_SEED_DEMO"] == "1",
+               let developmentDataDirectory = environment["CLIPFLOW_DEVELOPMENT_DATA_DIR"],
+               !developmentDataDirectory.isEmpty {
+                let normalizer = ClipboardNormalizer(
+                    maxRepresentationBytes: 5 * 1_024 * 1_024,
+                    maxCaptureBytes: 10 * 1_024 * 1_024
                 )
-                _ = try repository.upsert(
-                    ClipboardNormalizer(
-                        maxRepresentationBytes: 1_024 * 1_024,
-                        maxCaptureBytes: 1_024 * 1_024
-                    ).normalize(capture)
-                )
+                for fixture in DevelopmentDemoData.fixtures(
+                    now: Self.developmentDemoDate(environment: environment),
+                    existingFileURL: Self.developmentDemoFileURL(
+                        environment: environment,
+                        fallbackDirectory: support
+                    )
+                ) {
+                    _ = try repository.upsert(
+                        normalizer.normalize(fixture.capture),
+                        itemID: fixture.id,
+                        timestamp: fixture.capturedAt
+                    )
+                }
             }
             #endif
             let clipboard = SystemClipboard()
@@ -94,7 +118,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 itemIntegrations: itemIntegrations,
                 visualService: visualService
             )
-            let browserModel = BrowserTabModel(service: BrowserAutomation())
+            #if DEBUG
+            let browserService: any BrowserTabServing =
+                visualAcceptanceConfiguration != nil || environment["CLIPFLOW_BROWSER_EMPTY"] == "1"
+                    ? DevelopmentEmptyBrowserTabService()
+                    : BrowserAutomation()
+            #else
+            let browserService: any BrowserTabServing = BrowserAutomation()
+            #endif
+            let browserModel = BrowserTabModel(service: browserService)
+            let inputState = PanelInputStateStore()
             #if DEBUG
             if ProcessInfo.processInfo.environment["CLIPFLOW_SHOW_BROWSER_TABS"] == "1" {
                 browserModel.isShowing = true
@@ -105,45 +138,80 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     ClipFlowRootView(
                         model: model,
                         settings: settings,
-                        browserModel: browserModel
+                        browserModel: browserModel,
+                        inputState: inputState,
+                        userDefaults: runtimeDefaults,
+                        showSettings: { [weak self] in self?.showSettings() }
                     )
-                )
+                ),
+                inputState: inputState,
+                frameDefaults: runtimeDefaults,
+                handleCommand: { [weak self] action in
+                    self?.handlePanelCommand(
+                        action,
+                        model: model,
+                        browserModel: browserModel,
+                        inputState: inputState
+                    )
+                }
             )
-            let hotKeyController = GlobalHotKeyController()
-            try? hotKeyController.register(shortcut: settings.shortcut) { [weak self] in
-                self?.togglePanel()
+            let hotKeyController: GlobalHotKeyController?
+            if visualAcceptanceConfiguration == nil {
+                let controller = GlobalHotKeyController()
+                try? controller.register(shortcut: settings.shortcut) { [weak self] in
+                    self?.togglePanel()
+                }
+                hotKeyController = controller
+            } else {
+                hotKeyController = nil
             }
 
-            let monitor = PasteboardMonitor(pasteboard: clipboard)
-            Task {
-                await monitor.start { capture in
-                    do {
-                        let normalized = try ClipboardNormalizer(
-                            maxRepresentationBytes: 25 * 1_024 * 1_024,
-                            maxCaptureBytes: 100 * 1_024 * 1_024
-                        ).normalize(capture)
-                        _ = try repository.upsert(normalized)
-                        await model.reload()
-                    } catch ClipboardNormalizationError.noUsablePayload {
-                        return
-                    } catch {
-                        return
+            let pasteboardMonitor: PasteboardMonitor?
+            if visualAcceptanceConfiguration == nil {
+                let monitor = PasteboardMonitor(pasteboard: clipboard)
+                Task {
+                    await monitor.start { capture in
+                        do {
+                            let normalized = try ClipboardNormalizer(
+                                maxRepresentationBytes: 25 * 1_024 * 1_024,
+                                maxCaptureBytes: 100 * 1_024 * 1_024
+                            ).normalize(capture)
+                            _ = try repository.upsert(normalized)
+                            await model.reload()
+                        } catch ClipboardNormalizationError.noUsablePayload {
+                            return
+                        } catch {
+                            return
+                        }
                     }
                 }
+                pasteboardMonitor = monitor
+            } else {
+                pasteboardMonitor = nil
             }
 
             self.panelController = panelController
             self.hotKeyController = hotKeyController
-            self.monitor = monitor
+            self.monitor = pasteboardMonitor
             self.pasteService = pasteService
             self.settingsModel = settings
             createStatusItem()
             capturePasteTarget()
+            if let visualAcceptanceConfiguration {
+                try Self.writeVisualAcceptanceReadyFile(
+                    configuration: visualAcceptanceConfiguration
+                )
+            }
             panelController.show()
             #if DEBUG
             if ProcessInfo.processInfo.environment["CLIPFLOW_SHOW_PREVIEW"] == "1" {
                 Task {
                     await model.reload()
+                    if let previewableItem = model.items.first(where: {
+                        $0.kind == .image || $0.kind == .file
+                    }) {
+                        model.selectedItemID = previewableItem.id
+                    }
                     model.previewSelection()
                 }
             }
@@ -154,7 +222,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         } catch {
             let alert = NSAlert()
             alert.alertStyle = .critical
-            alert.messageText = "ClipFlow could not start"
+            alert.messageText = L10n.string("app.startup.error.title")
             alert.informativeText = error.localizedDescription
             alert.runModal()
             NSApp.terminate(nil)
@@ -199,23 +267,97 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
+    private func handlePanelCommand(
+        _ action: PanelCommandAction,
+        model: AppModel,
+        browserModel: BrowserTabModel,
+        inputState: PanelInputStateStore
+    ) {
+        switch action {
+        case .passThrough:
+            return
+        case .previewSelection:
+            if !browserModel.isShowing {
+                model.previewSelection()
+            }
+        case .pasteSelection:
+            Task {
+                if browserModel.isShowing {
+                    await browserModel.activateSelection()
+                } else {
+                    await model.pasteSelection()
+                }
+            }
+        case .pasteSelectionAsPlainText:
+            Task {
+                if browserModel.isShowing {
+                    await browserModel.activateSelection()
+                } else {
+                    await model.pasteSelectionAsPlainText()
+                }
+            }
+        case .clearSearch:
+            inputState.searchText = ""
+            if browserModel.isShowing {
+                browserModel.searchText = ""
+                if browserModel.selectedTab == nil {
+                    browserModel.selectedTabID = browserModel.filteredTabs.first?.id
+                }
+            } else {
+                model.searchText = ""
+                Task { await model.reload() }
+            }
+        case .dismissPanel:
+            panelController?.hide()
+        case .selectPrevious:
+            if browserModel.isShowing {
+                moveBrowserSelection(in: browserModel, by: -1)
+                inputState.requestBrowserFocus(browserModel.selectedTabID)
+            } else {
+                model.selectPrevious()
+                inputState.requestHistoryFocus(model.selectedItemID)
+            }
+        case .selectNext:
+            if browserModel.isShowing {
+                moveBrowserSelection(in: browserModel, by: 1)
+                inputState.requestBrowserFocus(browserModel.selectedTabID)
+            } else {
+                model.selectNext()
+                inputState.requestHistoryFocus(model.selectedItemID)
+            }
+        }
+    }
+
+    private func moveBrowserSelection(in model: BrowserTabModel, by offset: Int) {
+        let tabs = model.filteredTabs
+        guard !tabs.isEmpty else {
+            model.selectedTabID = nil
+            return
+        }
+        let currentIndex = model.selectedTabID.flatMap { selectedID in
+            tabs.firstIndex { $0.id == selectedID }
+        } ?? 0
+        let nextIndex = min(max(currentIndex + offset, 0), tabs.count - 1)
+        model.selectedTabID = tabs[nextIndex].id
+    }
+
     private func createStatusItem() {
         guard settingsModel?.showStatusBarItem != false else { return }
         let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         item.button?.image = NSImage(
             systemSymbolName: "doc.on.clipboard",
-            accessibilityDescription: "ClipFlow"
+            accessibilityDescription: L10n.string("app.name")
         )
         let menu = NSMenu()
         let showItem = NSMenuItem(
-            title: "Show ClipFlow",
+            title: L10n.string("menu.show"),
             action: #selector(showPanelFromMenu),
             keyEquivalent: ""
         )
         showItem.target = self
         menu.addItem(showItem)
         let settingsItem = NSMenuItem(
-            title: "Settings…",
+            title: L10n.string("menu.settings"),
             action: #selector(showSettings),
             keyEquivalent: ","
         )
@@ -223,7 +365,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(settingsItem)
         menu.addItem(.separator())
         let quitItem = NSMenuItem(
-            title: "Quit ClipFlow",
+            title: L10n.string("menu.quit"),
             action: #selector(quitApplication),
             keyEquivalent: "q"
         )
@@ -250,16 +392,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 640, height: 470),
-            styleMask: [.titled, .closable, .miniaturizable],
+            contentRect: NSRect(x: 0, y: 0, width: 640, height: 700),
+            styleMask: [.titled, .closable, .miniaturizable, .resizable],
             backing: .buffered,
             defer: false
         )
-        window.title = "ClipFlow Settings"
+        window.title = L10n.string("settings.window.title")
+        window.minSize = NSSize(width: 560, height: 520)
         window.isReleasedWhenClosed = false
         window.center()
         window.contentView = NSHostingView(
-            rootView: SettingsView(model: settingsModel, loginItemService: loginItemService)
+            rootView: SettingsWindowRootView(
+                model: settingsModel,
+                loginItemService: loginItemService
+            )
         )
         let controller = NSWindowController(window: window)
         settingsWindow = controller
@@ -316,4 +462,99 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         ).loadOrCreate()
         #endif
     }
+
+    private static func runtimeUserDefaults(
+        visualAcceptanceConfiguration: VisualAcceptanceConfiguration?
+    ) throws -> UserDefaults {
+        guard let configuration = visualAcceptanceConfiguration else {
+            return .standard
+        }
+
+        let tokenDigest = SHA256.hash(data: Data(configuration.token.utf8))
+            .prefix(12)
+            .map { String(format: "%02x", $0) }
+            .joined()
+        let suiteName = "local.clipflow.visual-acceptance.\(tokenDigest)"
+        guard let defaults = UserDefaults(suiteName: suiteName) else {
+            throw VisualAcceptanceSetupError.defaultsUnavailable
+        }
+        defaults.removePersistentDomain(forName: suiteName)
+        defaults.set(configuration.appearanceMode.rawValue, forKey: "appearanceMode")
+        defaults.set(configuration.listDensity.rawValue, forKey: "listDensity")
+        defaults.set(
+            configuration.browserTabManagementEnabled,
+            forKey: "browserTabManagementEnabled"
+        )
+        defaults.set(false, forKey: "showStatusBarItem")
+        defaults.set(false, forKey: "launchAtLogin")
+        defaults.set(false, forKey: "autoCheckUpdatesEnabled")
+        defaults.set(true, forKey: "hasCompletedOnboarding")
+        return defaults
+    }
+
+    private static func writeVisualAcceptanceReadyFile(
+        configuration: VisualAcceptanceConfiguration
+    ) throws {
+        let readyFile = URL(
+            fileURLWithPath: configuration.dataDirectory,
+            isDirectory: true
+        ).appendingPathComponent(".visual-acceptance-ready", isDirectory: false)
+        try Data(configuration.token.utf8).write(to: readyFile, options: .atomic)
+    }
+
+    #if DEBUG
+    private static func developmentDemoFileURL(
+        environment: [String: String],
+        fallbackDirectory: URL
+    ) -> URL {
+        guard let value = environment["CLIPFLOW_DEMO_FILE_URL"], !value.isEmpty else {
+            return fallbackDirectory.appendingPathComponent("ClipFlow.sqlite")
+        }
+        if let fileURL = URL(string: value), fileURL.isFileURL {
+            return fileURL
+        }
+        return URL(fileURLWithPath: value)
+    }
+
+    private static func developmentDemoDate(environment: [String: String]) -> Date {
+        guard let value = environment["CLIPFLOW_DEMO_NOW"],
+              let epochSeconds = TimeInterval(value) else {
+            return Date()
+        }
+        return Date(timeIntervalSince1970: epochSeconds)
+    }
+    #endif
 }
+
+private struct SettingsWindowRootView: View {
+    @Bindable var model: SettingsModel
+    let loginItemService: LoginItemService
+
+    var body: some View {
+        SettingsView(model: model, loginItemService: loginItemService)
+            .preferredColorScheme(model.appearanceMode.colorScheme)
+            .environment(\.locale, L10n.locale)
+    }
+}
+
+private enum VisualAcceptanceSetupError: LocalizedError {
+    case defaultsUnavailable
+
+    var errorDescription: String? {
+        L10n.string("app.startup.error.title")
+    }
+}
+
+#if DEBUG
+private struct DevelopmentEmptyBrowserTabService: BrowserTabServing {
+    func status(for browser: BrowserKind) -> BrowserAutomationStatus {
+        .authorized
+    }
+
+    func tabs(for browser: BrowserKind) throws -> [BrowserTab] {
+        []
+    }
+
+    func activate(_ tab: BrowserTab) throws {}
+}
+#endif

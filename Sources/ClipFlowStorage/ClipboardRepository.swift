@@ -24,14 +24,18 @@ public final class ClipboardRepository: @unchecked Sendable {
         try Migrations.apply(to: database)
     }
 
-    public func upsert(_ capture: NormalizedCapture) throws -> ClipboardItem {
+    public func upsert(
+        _ capture: NormalizedCapture,
+        itemID: UUID? = nil,
+        timestamp: Date = Date()
+    ) throws -> ClipboardItem {
         let existing = try database.query(
             "SELECT id, created_at, is_favorite, last_used_at, custom_title FROM clipboard_items WHERE content_hash = ?;",
             bindings: [.text(capture.contentHash)]
         ).first
-        let id = existing?.uuid("id") ?? UUID()
-        let createdAt = existing?.date("created_at") ?? Date()
-        let now = Date()
+        let id = existing?.uuid("id") ?? itemID ?? UUID()
+        let createdAt = existing?.date("created_at") ?? timestamp
+        let now = timestamp
         let favorite = existing?.bool("is_favorite") ?? false
         let lastUsed = existing?.date("last_used_at")
         let customTitle = existing?.string("custom_title")

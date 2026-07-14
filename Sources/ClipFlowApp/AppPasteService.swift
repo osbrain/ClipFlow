@@ -26,13 +26,21 @@ actor AppPasteService: PasteServing {
 
     func paste(item: ClipboardItem) async throws -> PasteOutcome {
         guard let target else { throw AppPasteServiceError.noTargetApplication }
+        return try await paste(
+            item: item,
+            mode: modeResolver.mode(for: target.bundleID)
+        )
+    }
+
+    func paste(item: ClipboardItem, mode: PasteMode) async throws -> PasteOutcome {
+        guard let target else { throw AppPasteServiceError.noTargetApplication }
         let payloads = try repository.payloads(for: item.id).map {
             NormalizedPayload(itemIndex: $0.itemIndex, type: $0.type, data: $0.data)
         }
         return try await coordinator.paste(
             PasteRequest(
                 payloads: payloads,
-                mode: modeResolver.mode(for: target.bundleID)
+                mode: mode
             ),
             target: target
         )
@@ -46,4 +54,3 @@ enum AppPasteServiceError: LocalizedError {
         "The previous application is no longer available."
     }
 }
-

@@ -16,23 +16,27 @@ public struct OnboardingView: View {
                 .font(.system(size: 52, weight: .medium))
                 .foregroundStyle(.blue)
             VStack(spacing: 8) {
-                Text("ClipFlow")
+                Text(L10n.string("app.name"))
                     .font(.largeTitle.weight(.semibold))
-                Text("Clipboard history stays encrypted on this Mac.")
+                Text(L10n.string("onboarding.subtitle"))
                     .foregroundStyle(.secondary)
             }
 
             VStack(spacing: 10) {
                 permissionRow(
                     icon: "key.fill",
-                    title: "Local encryption",
-                    status: "Enabled",
+                    title: L10n.string("onboarding.localEncryption"),
+                    status: L10n.string("onboarding.enabled"),
                     granted: true
                 )
                 permissionRow(
                     icon: "hand.raised.fill",
-                    title: "Automatic paste",
-                    status: settings.isAccessibilityTrusted ? "Granted" : "Optional",
+                    title: L10n.string("onboarding.automaticPaste"),
+                    status: L10n.string(
+                        settings.isAccessibilityTrusted
+                            ? "onboarding.granted"
+                            : "onboarding.optional"
+                    ),
                     granted: settings.isAccessibilityTrusted
                 )
             }
@@ -40,7 +44,7 @@ public struct OnboardingView: View {
 
             HStack {
                 if !settings.isAccessibilityTrusted {
-                    Button("Accessibility Settings") {
+                    Button(L10n.string("onboarding.accessibilitySettings")) {
                         guard let url = URL(
                             string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility"
                         ) else { return }
@@ -48,7 +52,7 @@ public struct OnboardingView: View {
                     }
                 }
                 Spacer()
-                Button("Continue", action: complete)
+                Button(L10n.string("onboarding.continue"), action: complete)
                     .buttonStyle(.borderedProminent)
                     .keyboardShortcut(.defaultAction)
             }
@@ -70,6 +74,7 @@ public struct OnboardingView: View {
             Image(systemName: icon)
                 .frame(width: 28, height: 28)
                 .foregroundStyle(granted ? .green : .secondary)
+                .accessibilityHidden(true)
             Text(title)
             Spacer()
             Text(status)

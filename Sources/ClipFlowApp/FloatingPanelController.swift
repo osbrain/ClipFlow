@@ -1,14 +1,29 @@
 import AppKit
+import ClipFlowUI
 import SwiftUI
 
 @MainActor
 final class FloatingPanelController: NSWindowController, NSWindowDelegate {
     private let frameDefaultsKey = "panelFrame"
-    private let minimumPanelSize = NSSize(width: 760, height: 480)
+    private let minimumPanelSize = NSSize(width: 800, height: 520)
+    private let inputState: PanelInputStateStore
+    private let frameDefaults: UserDefaults
+    private let commandRouter = PanelCommandRouter()
+    private let handleCommand: (PanelCommandAction) -> Void
+    nonisolated(unsafe) private var eventMonitor: Any?
 
-    init(rootView: AnyView) {
+    init(
+        rootView: AnyView,
+        inputState: PanelInputStateStore,
+        frameDefaults: UserDefaults = .standard,
+        handleCommand: @escaping (PanelCommandAction) -> Void
+    ) {
+        self.inputState = inputState
+        self.frameDefaults = frameDefaults
+        self.handleCommand = handleCommand
+        let initialSize = Self.developmentPanelSize ?? NSSize(width: 1000, height: 680)
         let panel = FloatingPanel(
-            contentRect: NSRect(x: 0, y: 0, width: 1000, height: 680),
+            contentRect: NSRect(origin: .zero, size: initialSize),
             styleMask: [.borderless, .resizable, .fullSizeContentView],
             backing: .buffered,
             defer: false
@@ -27,6 +42,12 @@ final class FloatingPanelController: NSWindowController, NSWindowDelegate {
         panel.delegate = self
     }
 
+    deinit {
+        if let eventMonitor {
+            NSEvent.removeMonitor(eventMonitor)
+        }
+    }
+
     @available(*, unavailable)
     required init?(coder: NSCoder) {
         fatalError("init(coder:) is unavailable")
@@ -43,17 +64,33 @@ final class FloatingPanelController: NSWindowController, NSWindowDelegate {
     func show() {
         guard let panel = window else { return }
         let screen = Self.frontmostApplicationScreen ?? Self.pointerScreen ?? NSScreen.main
-        let desiredFrame = restoredFrame ?? Self.centeredFrame(
-            size: panel.frame.size,
-            in: screen?.visibleFrame ?? panel.frame
-        )
+        let desiredFrame = if Self.developmentPanelSize != nil {
+            Self.centeredFrame(
+                size: panel.frame.size,
+                in: screen?.visibleFrame ?? panel.frame
+            )
+        } else {
+            restoredFrame ?? Self.centeredFrame(
+                size: panel.frame.size,
+                in: screen?.visibleFrame ?? panel.frame
+            )
+        }
         panel.setFrame(Self.clamp(desiredFrame, to: screen?.visibleFrame), display: false)
+        inputState.isPanelVisible = true
+        installEventMonitor()
         NSApp.activate(ignoringOtherApps: true)
         panel.makeKeyAndOrderFront(nil)
     }
 
     func hide() {
+        inputState.isPanelVisible = false
+        removeEventMonitor()
         window?.orderOut(nil)
+    }
+
+    func windowWillClose(_ notification: Notification) {
+        inputState.isPanelVisible = false
+        removeEventMonitor()
     }
 
     func windowDidMove(_ notification: Notification) {
@@ -66,11 +103,59 @@ final class FloatingPanelController: NSWindowController, NSWindowDelegate {
 
     private func saveFrame() {
         guard let frame = window?.frame else { return }
-        UserDefaults.standard.set(NSStringFromRect(frame), forKey: frameDefaultsKey)
+        frameDefaults.set(NSStringFromRect(frame), forKey: frameDefaultsKey)
+    }
+
+    private func installEventMonitor() {
+        guard eventMonitor == nil else { return }
+        eventMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+            guard let self,
+                  let panel = self.window,
+                  PanelEventRoutingScope.shouldRoute(
+                      isPanelKeyWindow: panel.isKeyWindow,
+                      eventTargetsPanel: event.window === panel
+                  ),
+                  let command = Self.command(for: event) else {
+                return event
+            }
+            let action = self.commandRouter.action(
+                for: command,
+                context: self.inputState.commandContext
+            )
+            guard action != .passThrough else { return event }
+            self.handleCommand(action)
+            return nil
+        }
+    }
+
+    private func removeEventMonitor() {
+        guard let eventMonitor else { return }
+        NSEvent.removeMonitor(eventMonitor)
+        self.eventMonitor = nil
+    }
+
+    private static func command(for event: NSEvent) -> PanelCommand? {
+        let modifiers = event.modifierFlags.intersection([.command, .option, .control, .shift])
+        switch event.keyCode {
+        case 49 where modifiers.isEmpty:
+            return PanelCommand.space
+        case 36 where modifiers == .command, 76 where modifiers == .command:
+            return PanelCommand.commandReturn
+        case 36 where modifiers.isEmpty, 76 where modifiers.isEmpty:
+            return PanelCommand.returnKey
+        case 53 where modifiers.isEmpty:
+            return PanelCommand.escape
+        case 126 where modifiers.isEmpty:
+            return PanelCommand.moveUp
+        case 125 where modifiers.isEmpty:
+            return PanelCommand.moveDown
+        default:
+            return nil
+        }
     }
 
     private var restoredFrame: NSRect? {
-        guard let value = UserDefaults.standard.string(forKey: frameDefaultsKey) else {
+        guard let value = frameDefaults.string(forKey: frameDefaultsKey) else {
             return nil
         }
         let frame = NSRectFromString(value)
@@ -82,6 +167,21 @@ final class FloatingPanelController: NSWindowController, NSWindowDelegate {
     private static var pointerScreen: NSScreen? {
         let pointer = NSEvent.mouseLocation
         return NSScreen.screens.first { NSMouseInRect(pointer, $0.frame, false) }
+    }
+
+    private static var developmentPanelSize: NSSize? {
+        #if DEBUG
+        let environment = ProcessInfo.processInfo.environment
+        guard let widthValue = environment["CLIPFLOW_WINDOW_WIDTH"],
+              let heightValue = environment["CLIPFLOW_WINDOW_HEIGHT"],
+              let width = Double(widthValue),
+              let height = Double(heightValue) else {
+            return nil
+        }
+        return NSSize(width: max(width, 800), height: max(height, 520))
+        #else
+        return nil
+        #endif
     }
 
     private static var frontmostApplicationScreen: NSScreen? {

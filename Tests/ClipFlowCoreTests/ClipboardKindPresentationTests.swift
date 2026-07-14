@@ -1,4 +1,6 @@
 import ClipFlowCore
+import ClipFlowSystem
+import Foundation
 import Testing
 @testable import ClipFlowUI
 
@@ -38,5 +40,68 @@ struct ClipboardKindPresentationTests {
             #expect(L10n.string(key, locale: "en") == english)
             #expect(L10n.string(key, locale: "zh-Hans") == simplifiedChinese)
         }
+    }
+
+    @Test("debug locale override selects matching translations")
+    func debugLocaleOverrideSelectsTranslations() {
+        let chineseEnvironment = ["CLIPFLOW_LOCALE_IDENTIFIER": "zh-Hans"]
+        let englishEnvironment = ["CLIPFLOW_LOCALE_IDENTIFIER": "en"]
+
+        #expect(L10n.locale(environment: chineseEnvironment).identifier == "zh-Hans")
+        #expect(L10n.locale(environment: englishEnvironment).identifier == "en")
+        #expect(L10n.string("filter.all", environment: chineseEnvironment) == "全部")
+        #expect(L10n.string("filter.all", environment: englishEnvironment) == "All")
+    }
+
+    @Test("date formatting follows the supplied locale")
+    func dateFormattingFollowsLocale() {
+        let date = Date(timeIntervalSince1970: 1_700_000_000)
+        let english = L10n.formattedDateTime(
+            date,
+            locale: Locale(identifier: "en_US")
+        )
+        let chinese = L10n.formattedDateTime(
+            date,
+            locale: Locale(identifier: "zh_Hans_CN")
+        )
+
+        #expect(english.contains("Nov"))
+        #expect(chinese.contains("11月"))
+        #expect(english != chinese)
+    }
+
+    @Test("UI action labels and user messages have English and Chinese translations")
+    func uiMessagesHaveTranslations() {
+        let keys = [
+            "onboarding.subtitle",
+            "onboarding.localEncryption",
+            "onboarding.enabled",
+            "onboarding.automaticPaste",
+            "onboarding.granted",
+            "onboarding.optional",
+            "onboarding.accessibilitySettings",
+            "onboarding.continue",
+            "error.preview",
+            "error.action",
+            "error.history.load",
+            "error.paste",
+            "error.favorite",
+            "error.rename",
+            "error.delete",
+            "error.category.create",
+            "error.category.assign",
+            "error.category.delete",
+            "error.browser.activate",
+            "action.feishu",
+            "action.doubao"
+        ]
+
+        for key in keys {
+            #expect(L10n.string(key, locale: "en") != key)
+            #expect(L10n.string(key, locale: "zh-Hans") != key)
+        }
+        #expect(ApplicationAction.openFeishu.localizedDisplayName == L10n.string("action.feishu"))
+        #expect(ApplicationAction.askDoubao.localizedDisplayName == L10n.string("action.doubao"))
+        #expect(L10n.format("error.action", "Feishu").contains("Feishu"))
     }
 }

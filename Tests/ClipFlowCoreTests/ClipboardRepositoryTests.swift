@@ -14,8 +14,10 @@ struct ClipboardRepositoryTests {
         let first = try harness.repository.upsert(
             harness.capture(hash: "same", preview: "First")
         )
+        let ignoredReplacementID = UUID()
         let second = try harness.repository.upsert(
-            harness.capture(hash: "same", preview: "Second")
+            harness.capture(hash: "same", preview: "Second"),
+            itemID: ignoredReplacementID
         )
         let results = try harness.repository.search(
             SearchQuery(
@@ -27,6 +29,7 @@ struct ClipboardRepositoryTests {
         )
 
         #expect(first.id == second.id)
+        #expect(second.id != ignoredReplacementID)
         #expect(results.map(\.id) == [first.id])
         #expect(try harness.repository.payloads(for: first.id).first?.data == Data("Second".utf8))
     }
@@ -45,6 +48,38 @@ struct ClipboardRepositoryTests {
 
         #expect(try harness.repository.item(id: item.id) != nil)
         #expect(try harness.repository.categories(for: item.id).isEmpty)
+    }
+
+    @Test("supplied timestamps persist and determine search order")
+    func suppliedTimestampsPersistAndOrderResults() throws {
+        let harness = try RepositoryHarness()
+        defer { harness.cleanup() }
+        let olderDate = Date(timeIntervalSince1970: 1_700_000_000)
+        let newerDate = olderDate.addingTimeInterval(60)
+        let olderID = UUID(uuidString: "20000000-0000-4000-8000-000000000001")!
+        let newerID = UUID(uuidString: "20000000-0000-4000-8000-000000000002")!
+
+        let older = try harness.repository.upsert(
+            harness.capture(hash: "older", preview: "Older"),
+            itemID: olderID,
+            timestamp: olderDate
+        )
+        let newer = try harness.repository.upsert(
+            harness.capture(hash: "newer", preview: "Newer"),
+            itemID: newerID,
+            timestamp: newerDate
+        )
+        let results = try harness.repository.search(
+            SearchQuery(text: "", categoryID: nil, kind: nil, favoritesOnly: false)
+        )
+
+        #expect(older.id == olderID)
+        #expect(older.createdAt == olderDate)
+        #expect(older.updatedAt == olderDate)
+        #expect(newer.id == newerID)
+        #expect(newer.createdAt == newerDate)
+        #expect(newer.updatedAt == newerDate)
+        #expect(results.map(\.id).prefix(2) == [newer.id, older.id])
     }
 }
 

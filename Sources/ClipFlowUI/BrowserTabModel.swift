@@ -66,9 +66,8 @@ public final class BrowserTabModel {
             try service.activate(selectedTab)
             errorMessage = nil
         } catch {
-            let message = "Unable to activate browser tab: \(error.localizedDescription)"
             await refresh()
-            errorMessage = message
+            errorMessage = L10n.string("error.browser.activate")
         }
     }
 }

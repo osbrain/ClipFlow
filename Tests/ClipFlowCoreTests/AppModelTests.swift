@@ -44,6 +44,51 @@ struct AppModelTests {
         #expect(repository.lastQuery?.favoritesOnly == true)
     }
 
+    @Test("applying a history filter clears mutually exclusive repository values")
+    func applyingHistoryFilterClearsOldValues() {
+        let repository = FakeHistoryRepository(items: [])
+        let model = AppModel(
+            repository: repository,
+            pasteService: FakePasteService()
+        )
+        let categoryID = UUID()
+
+        model.selectedCategoryID = categoryID
+        model.selectedKind = .image
+        model.favoritesOnly = true
+
+        model.apply(.kind(.file))
+        #expect(model.selectedKind == .file)
+        #expect(model.selectedCategoryID == nil)
+        #expect(!model.favoritesOnly)
+
+        model.apply(.category(categoryID))
+        #expect(model.selectedKind == nil)
+        #expect(model.selectedCategoryID == categoryID)
+        #expect(!model.favoritesOnly)
+
+        model.apply(.favorites)
+        #expect(model.selectedKind == nil)
+        #expect(model.selectedCategoryID == nil)
+        #expect(model.favoritesOnly)
+    }
+
+    @Test("plain text paste uses an explicit mode and marks the item used")
+    func plainTextPasteUsesExplicitMode() async {
+        let item = Self.item(preview: "Plain")
+        let repository = FakeHistoryRepository(items: [item])
+        let pasteService = FakePasteService()
+        let model = AppModel(repository: repository, pasteService: pasteService)
+        await model.reload()
+
+        await model.pasteSelectionAsPlainText()
+
+        #expect(repository.markedUsed == [item.id])
+        #expect(await pasteService.pasteRequests == [
+            FakePasteRequest(itemID: item.id, mode: .plainText)
+        ])
+    }
+
     @Test("favorite rename and delete actions update the repository")
     func itemActionsUpdateRepository() async {
         let item = Self.item(preview: "Original")
@@ -132,6 +177,73 @@ struct AppModelTests {
         #expect(visualService.requestedItems.isEmpty)
     }
 
+    @Test("reload preserves a completed thumbnail for unchanged content")
+    func reloadPreservesThumbnailForUnchangedContent() async throws {
+        let item = Self.item(preview: "Stable")
+        let repository = FakeHistoryRepository(items: [item])
+        let visualService = FakeClipboardVisualService()
+        let model = AppModel(
+            repository: repository,
+            pasteService: FakePasteService(),
+            visualService: visualService
+        )
+        await model.reload()
+
+        model.requestThumbnail(for: item, maximumPixelSize: 64)
+        await visualService.waitForRequestCount(1)
+        await visualService.completeRequest(at: 0, with: Self.image(width: 37))
+        await model.reload()
+
+        let thumbnail = try #require(model.visuals[item.id]?.thumbnail)
+        #expect(thumbnail.size.width == 37)
+        #expect(visualService.requestedItems.count == 1)
+    }
+
+    @Test("smaller thumbnail requests never downgrade a larger request")
+    func smallerThumbnailRequestDoesNotDowngrade() async throws {
+        let item = Self.item(preview: "Priority")
+        let visualService = FakeClipboardVisualService()
+        let model = AppModel(
+            repository: FakeHistoryRepository(items: [item]),
+            pasteService: FakePasteService(),
+            visualService: visualService
+        )
+        await model.reload()
+
+        model.requestThumbnail(for: item, maximumPixelSize: 720)
+        await visualService.waitForRequestCount(1)
+        model.requestThumbnail(for: item, maximumPixelSize: 320)
+
+        #expect(visualService.requestedPixelSizes == [720])
+        await visualService.completeRequest(at: 0, with: Self.image(width: 72))
+        let thumbnail = try #require(model.visuals[item.id]?.thumbnail)
+        #expect(thumbnail.size.width == 72)
+    }
+
+    @Test("larger thumbnail requests supersede smaller in-flight work")
+    func largerThumbnailRequestUpgrades() async throws {
+        let item = Self.item(preview: "Upgrade")
+        let visualService = FakeClipboardVisualService()
+        let model = AppModel(
+            repository: FakeHistoryRepository(items: [item]),
+            pasteService: FakePasteService(),
+            visualService: visualService
+        )
+        await model.reload()
+
+        model.requestThumbnail(for: item, maximumPixelSize: 320)
+        await visualService.waitForRequestCount(1)
+        model.requestThumbnail(for: item, maximumPixelSize: 720)
+        await visualService.waitForRequestCount(2)
+
+        #expect(visualService.requestedPixelSizes == [320, 720])
+        await visualService.completeRequest(at: 0, with: Self.image(width: 32))
+        #expect(model.visuals[item.id]?.thumbnail == nil)
+        await visualService.completeRequest(at: 1, with: Self.image(width: 72))
+        let thumbnail = try #require(model.visuals[item.id]?.thumbnail)
+        #expect(thumbnail.size.width == 72)
+    }
+
     @Test("removed items discard thumbnails that finish after reload")
     func removedItemsDiscardLateThumbnails() async {
         let item = Self.item(preview: "Remove")
@@ -171,6 +283,7 @@ struct AppModelTests {
         await visualService.waitForRequestCount(1)
         repository.replaceItems(with: [replacement])
         await model.reload()
+        #expect(model.visuals[itemID]?.thumbnail == nil)
         await visualService.completeRequest(at: 0, with: Self.image(width: 13))
         #expect(model.visuals[itemID]?.thumbnail == nil)
 
@@ -280,12 +393,26 @@ private final class FakeHistoryRepository: HistoryRepository, @unchecked Sendabl
 }
 
 private actor FakePasteService: PasteServing {
-    private(set) var pastedIDs: [UUID] = []
+    private(set) var pasteRequests: [FakePasteRequest] = []
+
+    var pastedIDs: [UUID] {
+        pasteRequests.map(\.itemID)
+    }
 
     func paste(item: ClipboardItem) async throws -> PasteOutcome {
-        pastedIDs.append(item.id)
+        pasteRequests.append(FakePasteRequest(itemID: item.id, mode: nil))
         return .pasted
     }
+
+    func paste(item: ClipboardItem, mode: PasteMode) async throws -> PasteOutcome {
+        pasteRequests.append(FakePasteRequest(itemID: item.id, mode: mode))
+        return .pasted
+    }
+}
+
+private struct FakePasteRequest: Equatable, Sendable {
+    let itemID: UUID
+    let mode: PasteMode?
 }
 
 @MainActor
@@ -318,6 +445,7 @@ private final class FakeClipboardVisualService: ClipboardVisualServing {
 
     private(set) var metadataItemIDs: [UUID] = []
     private(set) var requestedItems: [ClipboardItem] = []
+    private(set) var requestedPixelSizes: [Int] = []
     private var pendingRequests: [Int: PendingRequest] = [:]
 
     func metadataVisual(for item: ClipboardItem) -> ClipboardVisualDescriptor {
@@ -333,6 +461,7 @@ private final class FakeClipboardVisualService: ClipboardVisualServing {
     func loadThumbnail(for item: ClipboardItem, maximumPixelSize: Int) async -> NSImage? {
         let index = requestedItems.count
         requestedItems.append(item)
+        requestedPixelSizes.append(maximumPixelSize)
         return await withCheckedContinuation { continuation in
             pendingRequests[index] = PendingRequest(continuation: continuation)
         }

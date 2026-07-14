@@ -1,10 +1,14 @@
+import AppKit
 import ClipFlowCore
 import ClipFlowSystem
 import SwiftUI
 
 struct DetailView: View {
     let item: ClipboardItem?
+    let visual: ClipboardVisualDescriptor?
+    let settings: SettingsModel
     let paste: () -> Void
+    let pasteAsPlainText: () -> Void
     let preview: () -> Void
     let favorite: () -> Void
     let rename: () -> Void
@@ -15,95 +19,361 @@ struct DetailView: View {
     var body: some View {
         Group {
             if let item {
-                VStack(alignment: .leading, spacing: 0) {
-                    HStack {
-                        VStack(alignment: .leading, spacing: 3) {
-                            Text(item.displayTitle)
-                                .font(.headline)
-                                .lineLimit(2)
-                            Text(item.kind.rawValue.capitalized)
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                        Spacer()
-                        HStack(spacing: 6) {
-                            Button(action: preview) {
-                                Image(systemName: "eye")
-                            }
-                            .help("Quick Look")
-                            Button(action: favorite) {
-                                Image(systemName: item.isFavorite ? "star.fill" : "star")
-                            }
-                            .help(item.isFavorite ? "Remove Favorite" : "Favorite")
-                            Button(action: rename) {
-                                Image(systemName: "pencil")
-                            }
-                            .help("Rename")
-                            Button(role: .destructive, action: delete) {
-                                Image(systemName: "trash")
-                            }
-                            .help("Delete")
-                            Button(action: paste) {
-                                Label("Paste", systemImage: "arrow.down.doc")
-                            }
-                            .keyboardShortcut(.return, modifiers: [])
-                        }
+                ScrollView {
+                    VStack(alignment: .leading, spacing: ClipFlowVisualStyle.sectionSpacing) {
+                        SelectedSourceHeader(item: item, visual: visual)
+                        PreviewCard(item: item, visual: visual)
+                        metadataGrid(for: item)
+                        DetailActionStack(
+                            item: item,
+                            paste: paste,
+                            pasteAsPlainText: pasteAsPlainText,
+                            preview: preview,
+                            favorite: favorite,
+                            rename: rename,
+                            delete: delete,
+                            applicationActions: applicationActions,
+                            performApplicationAction: performApplicationAction
+                        )
                     }
-                    .padding(16)
-
-                    Divider()
-
-                    ScrollView {
-                        Text(item.previewText)
-                            .font(.system(size: 14))
-                            .textSelection(.enabled)
-                            .frame(maxWidth: .infinity, alignment: .topLeading)
-                            .padding(18)
-                    }
-
-                    if !applicationActions.isEmpty {
-                        Divider()
-                        HStack(spacing: 8) {
-                            ForEach(applicationActions, id: \.self) { action in
-                                Button {
-                                    performApplicationAction(action)
-                                } label: {
-                                    Label(action.displayName, systemImage: action.symbolName)
-                                }
-                            }
-                            Spacer()
-                        }
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 10)
-                    }
-
-                    Divider()
-
-                    Grid(alignment: .leading, horizontalSpacing: 16, verticalSpacing: 7) {
-                        metadata("Source", item.appName)
-                        metadata("Created", item.createdAt.formatted(date: .abbreviated, time: .shortened))
-                        metadata("Updated", item.updatedAt.formatted(date: .abbreviated, time: .shortened))
-                        metadata("Size", ByteCountFormatter.string(fromByteCount: Int64(item.byteSize), countStyle: .file))
-                    }
-                    .font(.caption)
-                    .padding(16)
+                    .padding(ClipFlowVisualStyle.panelPadding)
                 }
             } else {
                 ContentUnavailableView(
-                    "No Selection",
+                    L10n.string("detail.empty.title"),
                     systemImage: "cursorarrow.click",
-                    description: Text("Select an item to inspect its details.")
+                    description: Text(L10n.string("detail.empty.description"))
                 )
             }
         }
-        .background(Color(nsColor: .textBackgroundColor).opacity(0.5))
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Color(nsColor: .underPageBackgroundColor).opacity(0.32))
+    }
+
+    private var fieldVisibility: DetailFieldVisibility {
+        DetailFieldVisibility(
+            showsSource: settings.showDetailSource,
+            showsKind: settings.showDetailType,
+            showsCreated: settings.showDetailCreatedAt,
+            showsLastUsed: settings.showDetailLastUsedAt,
+            showsSize: settings.showDetailSize,
+            showsFormatting: settings.showDetailFormatting
+        )
     }
 
     @ViewBuilder
-    private func metadata(_ label: String, _ value: String) -> some View {
-        GridRow {
-            Text(label).foregroundStyle(.secondary)
-            Text(value).textSelection(.enabled)
+    private func metadataGrid(for item: ClipboardItem) -> some View {
+        let fields = fieldVisibility.visibleFields
+        if !fields.isEmpty {
+            LazyVGrid(
+                columns: [
+                    GridItem(.flexible(), spacing: 10),
+                    GridItem(.flexible(), spacing: 10)
+                ],
+                spacing: 10
+            ) {
+                ForEach(fields, id: \.self) { field in
+                    let presentation = metadataPresentation(field, item: item)
+                    MetadataCard(
+                        icon: presentation.icon,
+                        title: presentation.title,
+                        value: presentation.value
+                    )
+                }
+            }
         }
+    }
+
+    private func metadataPresentation(
+        _ field: DetailField,
+        item: ClipboardItem
+    ) -> (icon: String, title: String, value: String) {
+        switch field {
+        case .source:
+            ("app", L10n.string("detail.source"), item.appName)
+        case .kind:
+            (item.kind.presentation.symbolName, L10n.string("detail.kind"), item.kind.localizedDisplayName)
+        case .created:
+            ("calendar", L10n.string("detail.created"), L10n.formattedDateTime(item.createdAt))
+        case .lastUsed:
+            ("clock.arrow.circlepath", L10n.string("detail.lastUsed"), item.lastUsedAt.map(L10n.formattedDateTime) ?? "—")
+        case .size:
+            ("externaldrive", L10n.string("detail.size"), L10n.formattedByteCount(item.byteSize))
+        case .formatting:
+            ("textformat", L10n.string("detail.formatting"), item.kind.localizedFormattingAvailability)
+        }
+    }
+}
+
+private struct SelectedSourceHeader: View {
+    let item: ClipboardItem
+    let visual: ClipboardVisualDescriptor?
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Group {
+                if let icon = visual?.applicationIcon {
+                    Image(nsImage: icon)
+                        .resizable()
+                        .scaledToFit()
+                } else {
+                    Image(systemName: "app.dashed")
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .frame(width: 38, height: 38)
+            .accessibilityHidden(true)
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text(item.displayTitle)
+                    .font(.headline)
+                    .lineLimit(2)
+                Text(item.appName)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            Spacer(minLength: 8)
+            ClipboardKindBadge(kind: item.kind, size: 34)
+        }
+        .accessibilityElement(children: .combine)
+    }
+}
+
+private struct PreviewCard: View {
+    let item: ClipboardItem
+    let visual: ClipboardVisualDescriptor?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Label(L10n.string("detail.preview"), systemImage: "eye")
+                .font(.headline)
+
+            preview
+                .frame(maxWidth: .infinity, alignment: .topLeading)
+        }
+        .padding(14)
+        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 14))
+        .overlay {
+            RoundedRectangle(cornerRadius: 14)
+                .stroke(ClipFlowVisualStyle.hairlineColor)
+        }
+    }
+
+    @ViewBuilder
+    private var preview: some View {
+        switch item.kind.detailPreviewMode {
+        case .image:
+            if let thumbnail = visual?.thumbnail {
+                Image(nsImage: thumbnail)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(maxWidth: .infinity, minHeight: 150, maxHeight: 300)
+                    .clipShape(RoundedRectangle(cornerRadius: 10))
+                    .accessibilityLabel(item.displayTitle)
+            } else {
+                fallback(symbol: "photo", text: item.previewText)
+            }
+        case .file:
+            HStack(alignment: .top, spacing: 12) {
+                if let thumbnail = visual?.thumbnail {
+                    adjacentThumbnail(thumbnail, size: 64)
+                } else {
+                    ClipboardKindBadge(kind: .file, size: 46)
+                        .accessibilityHidden(true)
+                }
+                Text(normalizedFilePath)
+                    .font(.body.monospaced())
+                    .textSelection(.enabled)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        case .link:
+            HStack(alignment: .top, spacing: 10) {
+                Image(systemName: "link")
+                    .foregroundStyle(.tint)
+                    .accessibilityHidden(true)
+                Text(item.previewText)
+                    .foregroundStyle(.tint)
+                    .textSelection(.enabled)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        case .text:
+            Text(item.previewText)
+                .textSelection(.enabled)
+                .fixedSize(horizontal: false, vertical: true)
+        case .mixed:
+            HStack(alignment: .top, spacing: 12) {
+                if let thumbnail = visual?.thumbnail {
+                    adjacentThumbnail(thumbnail, size: 72)
+                } else {
+                    ClipboardKindBadge(kind: .mixed, size: 46)
+                        .accessibilityHidden(true)
+                }
+                Text(item.previewText)
+                    .textSelection(.enabled)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        case .unknown:
+            fallback(symbol: "questionmark.square.dashed", text: item.previewText)
+        }
+    }
+
+    private var normalizedFilePath: String {
+        let value = item.previewText.trimmingCharacters(in: .whitespacesAndNewlines)
+        if let url = URL(string: value), url.isFileURL {
+            return url.standardizedFileURL.path(percentEncoded: false)
+        }
+        return NSString(string: value).standardizingPath
+    }
+
+    private func fallback(symbol: String, text: String) -> some View {
+        HStack(alignment: .top, spacing: 12) {
+            Image(systemName: symbol)
+                .font(.system(size: 28, weight: .medium))
+                .foregroundStyle(.secondary)
+                .accessibilityHidden(true)
+            Text(text)
+                .textSelection(.enabled)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    private func adjacentThumbnail(_ thumbnail: NSImage, size: CGFloat) -> some View {
+        Image(nsImage: thumbnail)
+            .resizable()
+            .scaledToFit()
+            .frame(width: size, height: size)
+            .clipShape(RoundedRectangle(cornerRadius: 10))
+            .overlay {
+                RoundedRectangle(cornerRadius: 10)
+                    .stroke(ClipFlowVisualStyle.hairlineColor)
+            }
+            .accessibilityHidden(true)
+    }
+}
+
+private struct DetailActionStack: View {
+    let item: ClipboardItem
+    let paste: () -> Void
+    let pasteAsPlainText: () -> Void
+    let preview: () -> Void
+    let favorite: () -> Void
+    let rename: () -> Void
+    let delete: () -> Void
+    let applicationActions: [ApplicationAction]
+    let performApplicationAction: (ApplicationAction) -> Void
+
+    var body: some View {
+        GeometryReader { proxy in
+            let showsLabels = proxy.size.width >= 330
+            VStack(spacing: 9) {
+                actionButton(
+                    L10n.string("detail.paste"),
+                    icon: "arrow.down.doc",
+                    prominent: true,
+                    showsLabel: showsLabels,
+                    action: paste
+                )
+                .keyboardShortcut(.return, modifiers: [])
+
+                if supportsPlainTextPaste {
+                    actionButton(
+                        plainTextLabel,
+                        icon: item.kind == .file ? "point.topleft.down.to.point.bottomright.curvepath" : "textformat",
+                        prominent: false,
+                        showsLabel: showsLabels,
+                        action: pasteAsPlainText
+                    )
+                    .keyboardShortcut(.return, modifiers: .command)
+                }
+
+                HStack(spacing: 8) {
+                    compactButton(L10n.string("detail.preview"), icon: "eye", action: preview)
+                    compactButton(L10n.string(item.isFavorite ? "action.removeFavorite" : "action.favorite"), icon: item.isFavorite ? "star.fill" : "star", action: favorite)
+                    compactButton(L10n.string("action.rename"), icon: "pencil", action: rename)
+                    compactButton(L10n.string("action.delete"), icon: "trash", role: .destructive, action: delete)
+                }
+
+                ForEach(applicationActions, id: \.self) { applicationAction in
+                    actionButton(
+                        applicationAction.localizedDisplayName,
+                        icon: applicationAction.symbolName,
+                        prominent: false,
+                        showsLabel: true
+                    ) {
+                        performApplicationAction(applicationAction)
+                    }
+                }
+            }
+        }
+        .frame(height: actionStackHeight)
+    }
+
+    private var supportsPlainTextPaste: Bool {
+        switch item.kind {
+        case .text, .richText, .link, .file, .mixed: true
+        case .image, .unknown: false
+        }
+    }
+
+    private var plainTextLabel: String {
+        L10n.string(item.kind == .file ? "detail.pasteFilePath" : "detail.pastePlainText")
+    }
+
+    private var actionStackHeight: CGFloat {
+        let base = supportsPlainTextPaste ? 148.0 : 98.0
+        return base + CGFloat(applicationActions.count * 48)
+    }
+
+    @ViewBuilder
+    private func actionButton(
+        _ title: String,
+        icon: String,
+        prominent: Bool,
+        showsLabel: Bool,
+        action: @escaping () -> Void
+    ) -> some View {
+        if prominent {
+            Button(action: action) {
+                actionLabel(title: title, icon: icon, showsLabel: showsLabel)
+            }
+            .buttonStyle(.borderedProminent)
+            .controlSize(.large)
+            .accessibilityLabel(title)
+            .help(title)
+        } else {
+            Button(action: action) {
+                actionLabel(title: title, icon: icon, showsLabel: showsLabel)
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.large)
+            .accessibilityLabel(title)
+            .help(title)
+        }
+    }
+
+    private func actionLabel(title: String, icon: String, showsLabel: Bool) -> some View {
+        HStack {
+            Spacer()
+            Image(systemName: icon).accessibilityHidden(true)
+            if showsLabel { Text(title) }
+            Spacer()
+        }
+        .frame(height: 34)
+    }
+
+    private func compactButton(
+        _ title: String,
+        icon: String,
+        role: ButtonRole? = nil,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(role: role, action: action) {
+            Image(systemName: icon)
+                .frame(maxWidth: .infinity)
+                .accessibilityHidden(true)
+        }
+        .buttonStyle(.bordered)
+        .accessibilityLabel(title)
+        .help(title)
     }
 }

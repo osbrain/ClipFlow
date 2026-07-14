@@ -20,6 +20,13 @@ extension ClipboardRepository: HistoryRepository {}
 
 public protocol PasteServing: Sendable {
     func paste(item: ClipboardItem) async throws -> PasteOutcome
+    func paste(item: ClipboardItem, mode: PasteMode) async throws -> PasteOutcome
+}
+
+public extension PasteServing {
+    func paste(item: ClipboardItem, mode: PasteMode) async throws -> PasteOutcome {
+        try await paste(item: item)
+    }
 }
 
 @MainActor
@@ -51,6 +58,7 @@ public final class AppModel {
     @ObservationIgnored private let visualService: (any ClipboardVisualServing)?
     @ObservationIgnored private var thumbnailTasks: [UUID: Task<Void, Never>] = [:]
     @ObservationIgnored private var thumbnailRequestIDs: [UUID: UUID] = [:]
+    @ObservationIgnored private var thumbnailPixelSizes: [UUID: Int] = [:]
 
     public init(
         repository: any HistoryRepository,
@@ -69,6 +77,13 @@ public final class AppModel {
         return items.first { $0.id == selectedItemID }
     }
 
+    public func apply(_ filter: HistoryFilter) {
+        let state = filter.repositoryState
+        selectedKind = state.kind
+        selectedCategoryID = state.categoryID
+        favoritesOnly = state.favoritesOnly
+    }
+
     public var availableApplicationActions: [ApplicationAction] {
         guard let selectedItem, let itemIntegrations else { return [] }
         return itemIntegrations.availableActions(for: selectedItem)
@@ -84,7 +99,7 @@ public final class AppModel {
             try itemIntegrations.preview(selectedItem)
             errorMessage = nil
         } catch {
-            errorMessage = "Unable to preview the selected item: \(error.localizedDescription)"
+            errorMessage = L10n.string("error.preview")
         }
     }
 
@@ -98,7 +113,7 @@ public final class AppModel {
             try await itemIntegrations.perform(action, for: selectedItem)
             errorMessage = nil
         } catch {
-            errorMessage = "Unable to complete \(action.displayName): \(error.localizedDescription)"
+            errorMessage = L10n.format("error.action", action.localizedDisplayName)
         }
     }
 
@@ -115,13 +130,35 @@ public final class AppModel {
             )
             let results = try repository.search(query)
             categories = try repository.allCategories()
+            let previousItems = Dictionary(uniqueKeysWithValues: items.map { ($0.id, $0) })
+            let previousVisuals = visuals
+            let unchangedItemIDs = Set<UUID>(results.compactMap { item in
+                guard previousItems[item.id]?.contentHash == item.contentHash else {
+                    return nil
+                }
+                return item.id
+            })
+
+            let obsoleteThumbnailIDs = thumbnailTasks.keys.filter {
+                !unchangedItemIDs.contains($0)
+            }
+            for itemID in obsoleteThumbnailIDs {
+                thumbnailTasks[itemID]?.cancel()
+                thumbnailTasks[itemID] = nil
+                thumbnailRequestIDs[itemID] = nil
+            }
+            thumbnailPixelSizes = thumbnailPixelSizes.filter {
+                unchangedItemIDs.contains($0.key)
+            }
             items = results
-            thumbnailTasks.values.forEach { $0.cancel() }
-            thumbnailTasks.removeAll()
-            thumbnailRequestIDs.removeAll()
             if let visualService {
                 visuals = Dictionary(uniqueKeysWithValues: results.map {
-                    ($0.id, visualService.metadataVisual(for: $0))
+                    var descriptor = visualService.metadataVisual(for: $0)
+                    if unchangedItemIDs.contains($0.id),
+                       let thumbnail = previousVisuals[$0.id]?.thumbnail {
+                        descriptor = descriptor.replacingThumbnail(thumbnail)
+                    }
+                    return ($0.id, descriptor)
                 })
             } else {
                 visuals.removeAll()
@@ -133,7 +170,7 @@ public final class AppModel {
             }
             errorMessage = nil
         } catch {
-            errorMessage = "Unable to load clipboard history: \(error.localizedDescription)"
+            errorMessage = L10n.string("error.history.load")
         }
     }
 
@@ -143,12 +180,14 @@ public final class AppModel {
               visuals[item.id] != nil,
               items.contains(where: {
                   $0.id == item.id && $0.contentHash == item.contentHash
-              }) else {
+              }),
+              maximumPixelSize > thumbnailPixelSizes[item.id, default: 0] else {
             return
         }
 
         thumbnailTasks[item.id]?.cancel()
         let requestID = UUID()
+        thumbnailPixelSizes[item.id] = maximumPixelSize
         thumbnailRequestIDs[item.id] = requestID
         thumbnailTasks[item.id] = Task { @MainActor [weak self] in
             let thumbnail = await visualService.loadThumbnail(
@@ -183,7 +222,20 @@ public final class AppModel {
             errorMessage = nil
             await reload()
         } catch {
-            errorMessage = "Unable to paste the selected item: \(error.localizedDescription)"
+            errorMessage = L10n.string("error.paste")
+        }
+    }
+
+    public func pasteSelectionAsPlainText() async {
+        guard let item = selectedItem else { return }
+
+        do {
+            lastPasteOutcome = try await pasteService.paste(item: item, mode: .plainText)
+            try repository.markUsed(item.id)
+            errorMessage = nil
+            await reload()
+        } catch {
+            errorMessage = L10n.string("error.paste")
         }
     }
 
@@ -194,7 +246,7 @@ public final class AppModel {
             errorMessage = nil
             await reload()
         } catch {
-            errorMessage = "Unable to update favorite: \(error.localizedDescription)"
+            errorMessage = L10n.string("error.favorite")
         }
     }
 
@@ -205,7 +257,7 @@ public final class AppModel {
             errorMessage = nil
             await reload()
         } catch {
-            errorMessage = "Unable to rename the selected item: \(error.localizedDescription)"
+            errorMessage = L10n.string("error.rename")
         }
     }
 
@@ -217,7 +269,7 @@ public final class AppModel {
             selectedItemID = nil
             await reload()
         } catch {
-            errorMessage = "Unable to delete the selected item: \(error.localizedDescription)"
+            errorMessage = L10n.string("error.delete")
         }
     }
 
@@ -227,7 +279,7 @@ public final class AppModel {
             categories = try repository.allCategories()
             errorMessage = nil
         } catch {
-            errorMessage = "Unable to create category: \(error.localizedDescription)"
+            errorMessage = L10n.string("error.category.create")
         }
     }
 
@@ -238,7 +290,7 @@ public final class AppModel {
             errorMessage = nil
             await reload()
         } catch {
-            errorMessage = "Unable to assign category: \(error.localizedDescription)"
+            errorMessage = L10n.string("error.category.assign")
         }
     }
 
@@ -252,7 +304,7 @@ public final class AppModel {
             errorMessage = nil
             await reload()
         } catch {
-            errorMessage = "Unable to delete category: \(error.localizedDescription)"
+            errorMessage = L10n.string("error.category.delete")
         }
     }
 

@@ -3,6 +3,33 @@ import Testing
 import ClipFlowCore
 @testable import ClipFlowSystem
 
+@Suite("System clipboard plain text conversion")
+struct SystemClipboardPlainTextTests {
+    @Test("file URL plain text is a percent-decoded filesystem path")
+    func fileURLBecomesFilesystemPath() throws {
+        let fileURL = URL(fileURLWithPath: "/Users/Clip Flow/My File.txt")
+        let payload = NormalizedPayload(
+            itemIndex: 0,
+            type: "public.file-url",
+            data: fileURL.dataRepresentation
+        )
+
+        #expect(SystemClipboard.plainText(from: [payload]) == "/Users/Clip Flow/My File.txt")
+    }
+
+    @Test("web URLs remain URL text")
+    func webURLRemainsURLText() {
+        let value = "https://example.com/a%20path"
+        let payload = NormalizedPayload(
+            itemIndex: 0,
+            type: "public.url",
+            data: Data(value.utf8)
+        )
+
+        #expect(SystemClipboard.plainText(from: [payload]) == value)
+    }
+}
+
 @Suite("Paste mode resolution")
 struct PasteModeResolverTests {
     @Test("per-application preference overrides the default")

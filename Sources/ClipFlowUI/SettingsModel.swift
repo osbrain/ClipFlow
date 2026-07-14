@@ -8,9 +8,14 @@ public protocol SettingsStoring: Sendable {
     func integer(forKey key: String) -> Int
     func string(forKey key: String) -> String?
     func set(_ value: Any?, forKey key: String)
+    func containsValue(forKey key: String) -> Bool
 }
 
-extension UserDefaults: SettingsStoring {}
+extension UserDefaults: SettingsStoring {
+    public func containsValue(forKey key: String) -> Bool {
+        object(forKey: key) != nil
+    }
+}
 
 public protocol PermissionStatusProviding: Sendable {
     func isAccessibilityTrusted() -> Bool
@@ -21,6 +26,13 @@ public struct SystemPermissionStatus: PermissionStatusProviding {
     public func isAccessibilityTrusted() -> Bool { AXIsProcessTrusted() }
 }
 
+public enum RetentionPreference: String, CaseIterable, Sendable {
+    case day
+    case week
+    case month
+    case unlimited
+}
+
 @MainActor
 @Observable
 public final class SettingsModel {
@@ -29,7 +41,7 @@ public final class SettingsModel {
     public var listDensity: ClipFlowListDensity
     public var launchAtLogin: Bool
     public var showStatusBarItem: Bool
-    public var retentionPolicy: String
+    public var retention: RetentionPreference
     public var maximumItemCount: Int
     public var maximumStorageMB: Int
     public var externalPayloadThresholdMB: Int
@@ -43,6 +55,8 @@ public final class SettingsModel {
     public var showDetailType: Bool
     public var showDetailCreatedAt: Bool
     public var showDetailLastUsedAt: Bool
+    public var showDetailSize: Bool
+    public var showDetailFormatting: Bool
     public private(set) var isAccessibilityTrusted = false
 
     @ObservationIgnored private let store: any SettingsStoring
@@ -65,9 +79,11 @@ public final class SettingsModel {
             rawValue: store.string(forKey: "listDensity") ?? ""
         ) ?? .comfortable
         launchAtLogin = store.bool(forKey: "launchAtLogin")
-        showStatusBarItem = store.string(forKey: "showStatusBarItem") == nil
-            ? true : store.bool(forKey: "showStatusBarItem")
-        retentionPolicy = store.string(forKey: "retentionPolicy") ?? "month"
+        showStatusBarItem = store.containsValue(forKey: "showStatusBarItem")
+            ? store.bool(forKey: "showStatusBarItem") : true
+        retention = RetentionPreference(
+            rawValue: store.string(forKey: "retentionPolicy") ?? ""
+        ) ?? .month
         maximumItemCount = max(100, store.integer(forKey: "maximumItemCount"))
         if store.integer(forKey: "maximumItemCount") == 0 { maximumItemCount = 10_000 }
         maximumStorageMB = max(100, store.integer(forKey: "maximumStorageMB"))
@@ -76,18 +92,22 @@ public final class SettingsModel {
         browserTabManagementEnabled = store.bool(forKey: "browserTabManagementEnabled")
         feishuActionEnabled = store.bool(forKey: "feishuActionEnabled")
         doubaoActionEnabled = store.bool(forKey: "doubaoActionEnabled")
-        autoCheckUpdatesEnabled = store.string(forKey: "autoCheckUpdatesEnabled") == nil
-            ? true : store.bool(forKey: "autoCheckUpdatesEnabled")
+        autoCheckUpdatesEnabled = store.containsValue(forKey: "autoCheckUpdatesEnabled")
+            ? store.bool(forKey: "autoCheckUpdatesEnabled") : true
         debugLoggingEnabled = store.bool(forKey: "debugLoggingEnabled")
         defaultPasteMode = store.string(forKey: "defaultPasteMode") ?? "original"
-        showDetailSource = store.string(forKey: "showDetailSource") == nil
-            ? true : store.bool(forKey: "showDetailSource")
-        showDetailType = store.string(forKey: "showDetailType") == nil
-            ? true : store.bool(forKey: "showDetailType")
-        showDetailCreatedAt = store.string(forKey: "showDetailCreatedAt") == nil
-            ? true : store.bool(forKey: "showDetailCreatedAt")
-        showDetailLastUsedAt = store.string(forKey: "showDetailLastUsedAt") == nil
-            ? true : store.bool(forKey: "showDetailLastUsedAt")
+        showDetailSource = store.containsValue(forKey: "showDetailSource")
+            ? store.bool(forKey: "showDetailSource") : true
+        showDetailType = store.containsValue(forKey: "showDetailType")
+            ? store.bool(forKey: "showDetailType") : true
+        showDetailCreatedAt = store.containsValue(forKey: "showDetailCreatedAt")
+            ? store.bool(forKey: "showDetailCreatedAt") : true
+        showDetailLastUsedAt = store.containsValue(forKey: "showDetailLastUsedAt")
+            ? store.bool(forKey: "showDetailLastUsedAt") : true
+        showDetailSize = store.containsValue(forKey: "showDetailSize")
+            ? store.bool(forKey: "showDetailSize") : true
+        showDetailFormatting = store.containsValue(forKey: "showDetailFormatting")
+            ? store.bool(forKey: "showDetailFormatting") : true
         isAccessibilityTrusted = permissions.isAccessibilityTrusted()
     }
 
@@ -101,7 +121,7 @@ public final class SettingsModel {
         store.set(listDensity.rawValue, forKey: "listDensity")
         store.set(launchAtLogin, forKey: "launchAtLogin")
         store.set(showStatusBarItem, forKey: "showStatusBarItem")
-        store.set(retentionPolicy, forKey: "retentionPolicy")
+        store.set(retention.rawValue, forKey: "retentionPolicy")
         store.set(maximumItemCount, forKey: "maximumItemCount")
         store.set(maximumStorageMB, forKey: "maximumStorageMB")
         store.set(externalPayloadThresholdMB, forKey: "externalPayloadThresholdMB")
@@ -115,6 +135,8 @@ public final class SettingsModel {
         store.set(showDetailType, forKey: "showDetailType")
         store.set(showDetailCreatedAt, forKey: "showDetailCreatedAt")
         store.set(showDetailLastUsedAt, forKey: "showDetailLastUsedAt")
+        store.set(showDetailSize, forKey: "showDetailSize")
+        store.set(showDetailFormatting, forKey: "showDetailFormatting")
     }
 
     public func refreshPermissions() async {

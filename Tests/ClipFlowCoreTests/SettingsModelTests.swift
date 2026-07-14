@@ -5,6 +5,80 @@ import Testing
 @Suite("Settings model")
 @MainActor
 struct SettingsModelTests {
+    @Test("retention preferences have stable stored values")
+    func retentionPreferencesHaveStableStoredValues() {
+        #expect(RetentionPreference.day.rawValue == "day")
+        #expect(RetentionPreference.week.rawValue == "week")
+        #expect(RetentionPreference.month.rawValue == "month")
+        #expect(RetentionPreference.unlimited.rawValue == "unlimited")
+        #expect(RetentionPreference.allCases == [.day, .week, .month, .unlimited])
+    }
+
+    @Test("loads retention from the legacy storage key and defaults unknown values safely")
+    func loadsRetentionFromLegacyKeyAndDefaultsUnknownValues() {
+        let permissions = FakePermissionStatus(accessibilityTrusted: false)
+        let migratedStore = MemorySettingsStore(values: ["retentionPolicy": "week"])
+        let migrated = SettingsModel(store: migratedStore, permissions: permissions)
+        #expect(migrated.retention == .week)
+
+        let unknownStore = MemorySettingsStore(values: ["retentionPolicy": "future-policy"])
+        let unknown = SettingsModel(store: unknownStore, permissions: permissions)
+        #expect(unknown.retention == .month)
+
+        let empty = SettingsModel(store: MemorySettingsStore(), permissions: permissions)
+        #expect(empty.retention == .month)
+    }
+
+    @Test("retention round-trips through the existing storage key")
+    func retentionRoundTripsThroughExistingStorageKey() {
+        let store = MemorySettingsStore()
+        let permissions = FakePermissionStatus(accessibilityTrusted: false)
+        let model = SettingsModel(store: store, permissions: permissions)
+
+        model.retention = .unlimited
+        model.save()
+
+        #expect(store.string(forKey: "retentionPolicy") == "unlimited")
+        #expect(SettingsModel(store: store, permissions: permissions).retention == .unlimited)
+    }
+
+    @Test("new detail fields default to visible and persist")
+    func newDetailFieldsDefaultToVisibleAndPersist() {
+        let store = MemorySettingsStore()
+        let permissions = FakePermissionStatus(accessibilityTrusted: false)
+        let model = SettingsModel(store: store, permissions: permissions)
+
+        #expect(model.showDetailSize)
+        #expect(model.showDetailFormatting)
+
+        model.showDetailSize = false
+        model.showDetailFormatting = false
+        model.save()
+
+        let restored = SettingsModel(store: store, permissions: permissions)
+        #expect(!restored.showDetailSize)
+        #expect(!restored.showDetailFormatting)
+        #expect(store.bool(forKey: "showDetailSize") == false)
+        #expect(store.bool(forKey: "showDetailFormatting") == false)
+    }
+
+    @Test("settings store presence preserves persisted false values")
+    func settingsStorePresencePreservesPersistedFalseValues() {
+        let store = AccuratePresenceSettingsStore()
+        let permissions = FakePermissionStatus(accessibilityTrusted: false)
+        let model = SettingsModel(store: store, permissions: permissions)
+
+        model.showDetailSize = false
+        model.showDetailFormatting = false
+        model.autoCheckUpdatesEnabled = false
+        model.save()
+
+        let restored = SettingsModel(store: store, permissions: permissions)
+        #expect(!restored.showDetailSize)
+        #expect(!restored.showDetailFormatting)
+        #expect(!restored.autoCheckUpdatesEnabled)
+    }
+
     @Test("clamps storage threshold and refreshes permission state")
     func clampsThresholdAndRefreshesPermissions() async {
         let store = MemorySettingsStore()
@@ -38,6 +112,35 @@ struct SettingsModelTests {
 
 private final class MemorySettingsStore: SettingsStoring, @unchecked Sendable {
     private let lock = NSLock()
+    private var values: [String: Any]
+
+    init(values: [String: Any] = [:]) {
+        self.values = values
+    }
+
+    func bool(forKey key: String) -> Bool {
+        lock.withLock { values[key] as? Bool ?? false }
+    }
+
+    func integer(forKey key: String) -> Int {
+        lock.withLock { values[key] as? Int ?? 0 }
+    }
+
+    func string(forKey key: String) -> String? {
+        lock.withLock { values[key] as? String }
+    }
+
+    func set(_ value: Any?, forKey key: String) {
+        lock.withLock { values[key] = value }
+    }
+
+    func containsValue(forKey key: String) -> Bool {
+        lock.withLock { values[key] != nil }
+    }
+}
+
+private final class AccuratePresenceSettingsStore: SettingsStoring, @unchecked Sendable {
+    private let lock = NSLock()
     private var values: [String: Any] = [:]
 
     func bool(forKey key: String) -> Bool {
@@ -54,6 +157,10 @@ private final class MemorySettingsStore: SettingsStoring, @unchecked Sendable {
 
     func set(_ value: Any?, forKey key: String) {
         lock.withLock { values[key] = value }
+    }
+
+    func containsValue(forKey key: String) -> Bool {
+        lock.withLock { values[key] != nil }
     }
 }
 

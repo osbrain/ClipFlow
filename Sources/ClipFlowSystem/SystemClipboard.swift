@@ -86,16 +86,23 @@ public final class SystemClipboard: PasteboardAccess, ClipboardWriting,
         return pasteboard.changeCount
     }
 
-    private static func plainText(from payloads: [NormalizedPayload]) -> String? {
+    static func plainText(from payloads: [NormalizedPayload]) -> String? {
         let preferredTypes = [
             "public.utf8-plain-text",
             "public.plain-text",
-            "public.url",
-            "public.file-url"
+            "public.file-url",
+            "public.url"
         ]
         for type in preferredTypes {
-            if let payload = payloads.first(where: { $0.type == type }),
-               let text = String(data: payload.data, encoding: .utf8) {
+            guard let payload = payloads.first(where: { $0.type == type }) else {
+                continue
+            }
+            if type == "public.file-url",
+               let fileURL = URL(dataRepresentation: payload.data, relativeTo: nil),
+               fileURL.isFileURL {
+                return fileURL.standardizedFileURL.path(percentEncoded: false)
+            }
+            if let text = String(data: payload.data, encoding: .utf8) {
                 return text
             }
         }
