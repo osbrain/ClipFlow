@@ -68,8 +68,20 @@ public enum DevelopmentDemoData {
                 kind: .file,
                 appName: "Finder",
                 bundleID: "com.apple.finder",
-                type: "public.file-url",
-                data: existingFileURL.dataRepresentation
+                representations: [
+                    RawClipboardRepresentation(
+                        type: "public.file-url",
+                        data: existingFileURL.dataRepresentation
+                    ),
+                    RawClipboardRepresentation(
+                        type: "public.utf8-plain-text",
+                        data: Data(existingFileURL.path.utf8)
+                    ),
+                    RawClipboardRepresentation(
+                        type: "com.apple.finder.node",
+                        data: Data([1, 2, 3])
+                    )
+                ]
             ),
             fixture(
                 id: "10000000-0000-4000-8000-000000000005",
@@ -77,8 +89,20 @@ public enum DevelopmentDemoData {
                 kind: .link,
                 appName: "Safari",
                 bundleID: "com.apple.Safari",
-                type: "public.url",
-                data: Data("https://example.com/clipflow/visual-acceptance".utf8)
+                representations: [
+                    RawClipboardRepresentation(
+                        type: "public.url",
+                        data: Data("https://example.com/clipflow/visual-acceptance".utf8)
+                    ),
+                    RawClipboardRepresentation(
+                        type: "public.utf8-plain-text",
+                        data: Data("ClipFlow Visual Acceptance".utf8)
+                    ),
+                    RawClipboardRepresentation(
+                        type: "org.chromium.source-url",
+                        data: Data("https://example.com/clipflow/visual-acceptance".utf8)
+                    )
+                ]
             )
         ]
     }
@@ -92,6 +116,26 @@ public enum DevelopmentDemoData {
         type: String,
         data: Data
     ) -> DevelopmentDemoFixture {
+        fixture(
+            id: id,
+            capturedAt: capturedAt,
+            kind: kind,
+            appName: appName,
+            bundleID: bundleID,
+            representations: [
+                RawClipboardRepresentation(type: type, data: data)
+            ]
+        )
+    }
+
+    private static func fixture(
+        id: String,
+        capturedAt: Date,
+        kind: ClipboardKind,
+        appName: String,
+        bundleID: String,
+        representations: [RawClipboardRepresentation]
+    ) -> DevelopmentDemoFixture {
         DevelopmentDemoFixture(
             id: UUID(uuidString: id)!,
             capturedAt: capturedAt,
@@ -101,9 +145,7 @@ public enum DevelopmentDemoData {
                 sourceBundleID: bundleID,
                 items: [
                     RawClipboardItem(
-                        representations: [
-                            RawClipboardRepresentation(type: type, data: data)
-                        ]
+                        representations: representations
                     )
                 ]
             )

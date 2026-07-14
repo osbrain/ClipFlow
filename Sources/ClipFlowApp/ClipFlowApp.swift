@@ -274,6 +274,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
             panelController.show()
             #if DEBUG
+            if let selectedKind = visualAcceptanceConfiguration?.selectedKind {
+                Task {
+                    await model.reload()
+                    model.selectedItemID = model.items.first(where: {
+                        $0.kind == selectedKind
+                    })?.id
+                }
+            }
             if ProcessInfo.processInfo.environment["CLIPFLOW_SHOW_PREVIEW"] == "1" {
                 Task {
                     await model.reload()
@@ -640,6 +648,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         )
         defaults.set(false, forKey: "showStatusBarItem")
         defaults.set(false, forKey: "launchAtLogin")
+        defaults.set(RetentionPreference.unlimited.rawValue, forKey: "retentionPolicy")
         defaults.set(true, forKey: "hasCompletedOnboarding")
         return defaults
     }

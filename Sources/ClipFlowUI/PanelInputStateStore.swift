@@ -1,3 +1,4 @@
+import ClipFlowCore
 import Foundation
 import Observation
 
@@ -60,6 +61,7 @@ public struct VisualAcceptanceConfiguration: Equatable, Sendable {
     public let appearanceMode: ClipFlowAppearanceMode
     public let listDensity: ClipFlowListDensity
     public let browserTabManagementEnabled: Bool
+    public let selectedKind: ClipboardKind?
 
     public static func isProbe(arguments: [String]) -> Bool {
         arguments.contains("--clipflow-acceptance-probe")
@@ -95,7 +97,9 @@ public struct VisualAcceptanceConfiguration: Equatable, Sendable {
             dataDirectory: dataDirectory,
             appearanceMode: appearanceMode,
             listDensity: listDensity,
-            browserTabManagementEnabled: browserValue.map(parseBoolean) ?? true
+            browserTabManagementEnabled: browserValue.map(parseBoolean) ?? true,
+            selectedKind: environment["CLIPFLOW_SELECTED_KIND"]
+                .flatMap(ClipboardKind.init(rawValue:))
         )
     }
 

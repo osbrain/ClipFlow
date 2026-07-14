@@ -57,8 +57,8 @@ struct DevelopmentDemoDataTests {
             ["public.utf8-plain-text"],
             ["public.rtf"],
             ["public.png"],
-            ["public.file-url"],
-            ["public.url"]
+            ["public.file-url", "public.utf8-plain-text", "com.apple.finder.node"],
+            ["public.url", "public.utf8-plain-text", "org.chromium.source-url"]
         ])
         #expect(fixtures.map { $0.capture.sourceBundleID } == [
             "com.apple.Notes",
@@ -91,10 +91,30 @@ struct DevelopmentDemoDataTests {
             data: fixtures[4].capture.items[0].representations[0].data,
             encoding: .utf8
         ))
+        let filePathRepresentation = try #require(
+            fixtures[3].capture.items[0].representations.first {
+                $0.type == "public.utf8-plain-text"
+            }
+        )
+        let linkTitleRepresentation = try #require(
+            fixtures[4].capture.items[0].representations.first {
+                $0.type == "public.utf8-plain-text"
+            }
+        )
+        let filePath = try #require(String(
+            data: filePathRepresentation.data,
+            encoding: .utf8
+        ))
+        let linkTitle = try #require(String(
+            data: linkTitleRepresentation.data,
+            encoding: .utf8
+        ))
 
         #expect(text.contains("\n"))
         #expect(fileURL == existingFileURL)
+        #expect(filePath == existingFileURL.path)
         #expect(link.hasPrefix("https://"))
+        #expect(linkTitle == "ClipFlow Visual Acceptance")
     }
 
     @Test("image fixture decodes as a recognizable non-square PNG")

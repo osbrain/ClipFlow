@@ -144,6 +144,11 @@ rm -f \
     "$OUTPUT_DIR/light-en-wide.png" \
     "$OUTPUT_DIR/light-en-compact.png" \
     "$OUTPUT_DIR/light-en-settings.png" \
+    "$OUTPUT_DIR/dark-zh-settings.png" \
+    "$OUTPUT_DIR/light-en-file-actions.png" \
+    "$OUTPUT_DIR/light-en-link-actions.png" \
+    "$OUTPUT_DIR/light-en-image-actions.png" \
+    "$OUTPUT_DIR/light-en-text-actions.png" \
     "$OUTPUT_DIR/light-en-browser-empty.png" \
     "$OUTPUT_DIR/light-en-quick-look.png"
 
@@ -213,6 +218,7 @@ for candidate in candidates {
             && candidate.width <= 600
             && candidate.height >= 180
             && candidate.height <= 500
+            && !candidate.title.isEmpty
             && mainWidth.map { candidate.width < $0 } != false
             && mainHeight.map { candidate.height < $0 } != false
             && !candidate.title.localizedCaseInsensitiveContains("ClipFlow Settings")
@@ -421,6 +427,21 @@ capture_scenario \
 capture_scenario \
     "light-en-settings" "en" "en_US" "light" "comfortable" 1000 680 "ClipFlow Settings" 0 \
     "CLIPFLOW_SHOW_SETTINGS=1"
+capture_scenario \
+    "dark-zh-settings" "zh-Hans" "zh_CN" "dark" "comfortable" 1000 680 "ClipFlow 设置" 0 \
+    "CLIPFLOW_SHOW_SETTINGS=1"
+capture_scenario \
+    "light-en-file-actions" "en" "en_US" "light" "comfortable" 1000 680 "" 1 \
+    "CLIPFLOW_SELECTED_KIND=file"
+capture_scenario \
+    "light-en-link-actions" "en" "en_US" "light" "comfortable" 1000 680 "" 1 \
+    "CLIPFLOW_SELECTED_KIND=link"
+capture_scenario \
+    "light-en-image-actions" "en" "en_US" "light" "comfortable" 1000 680 "" 1 \
+    "CLIPFLOW_SELECTED_KIND=image"
+capture_scenario \
+    "light-en-text-actions" "en" "en_US" "light" "comfortable" 1000 680 "" 1 \
+    "CLIPFLOW_SELECTED_KIND=text"
 capture_scenario \
     "light-en-browser-empty" "en" "en_US" "light" "comfortable" 1000 680 "" 1 \
     "CLIPFLOW_SHOW_BROWSER_TABS=1" \

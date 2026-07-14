@@ -1,4 +1,5 @@
 import Testing
+import ClipFlowCore
 @testable import ClipFlowUI
 
 @Suite("Visual acceptance configuration")
@@ -46,7 +47,8 @@ struct VisualAcceptanceConfigurationTests {
                 "CLIPFLOW_VISUAL_ACCEPTANCE": "1",
                 "CLIPFLOW_ACCEPTANCE_TOKEN": "capture-456",
                 "CLIPFLOW_DEVELOPMENT_DATA_DIR": "/tmp/clipflow-capture",
-                "CLIPFLOW_LIST_DENSITY": "compact"
+                "CLIPFLOW_LIST_DENSITY": "compact",
+                "CLIPFLOW_SELECTED_KIND": "file"
             ],
             arguments: [
                 "ClipFlowApp",
@@ -60,5 +62,21 @@ struct VisualAcceptanceConfigurationTests {
         #expect(configuration.appearanceMode == .dark)
         #expect(configuration.listDensity == .compact)
         #expect(!configuration.browserTabManagementEnabled)
+        #expect(configuration.selectedKind == .file)
+    }
+
+    @Test("unknown selected kinds fall back to the default selection")
+    func rejectsUnknownSelectedKind() throws {
+        let configuration = try #require(VisualAcceptanceConfiguration.validated(
+            environment: [
+                "CLIPFLOW_VISUAL_ACCEPTANCE": "1",
+                "CLIPFLOW_ACCEPTANCE_TOKEN": "capture-789",
+                "CLIPFLOW_DEVELOPMENT_DATA_DIR": "/tmp/clipflow-capture",
+                "CLIPFLOW_SELECTED_KIND": "future-kind"
+            ],
+            arguments: ["ClipFlowApp"]
+        ))
+
+        #expect(configuration.selectedKind == nil)
     }
 }

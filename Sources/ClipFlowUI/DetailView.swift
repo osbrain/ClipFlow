@@ -22,7 +22,6 @@ struct DetailView: View {
                     VStack(alignment: .leading, spacing: ClipFlowVisualStyle.sectionSpacing) {
                         SelectedSourceHeader(item: item, visual: visual)
                         PreviewCard(item: item, visual: visual)
-                        metadataGrid(for: item)
                         DetailActionStack(
                             item: item,
                             contextActions: contextActions,
@@ -33,6 +32,7 @@ struct DetailView: View {
                             applicationActions: applicationActions,
                             performApplicationAction: performApplicationAction
                         )
+                        metadataGrid(for: item)
                     }
                     .padding(ClipFlowVisualStyle.panelPadding)
                 }
@@ -261,8 +261,25 @@ private struct DetailActionStack: View {
 
     var body: some View {
         VStack(spacing: 9) {
-            ForEach(contextActions, id: \.self) { action in
-                contextActionButton(action)
+            if contextActions.contains(.pasteOriginal) {
+                contextActionButton(.pasteOriginal)
+            }
+
+            let secondaryActions = contextActions.filter { $0 != .pasteOriginal }
+            if !secondaryActions.isEmpty {
+                LazyVGrid(
+                    columns: secondaryActions.count == 1
+                        ? [GridItem(.flexible())]
+                        : [
+                            GridItem(.flexible(), spacing: 8),
+                            GridItem(.flexible(), spacing: 8)
+                        ],
+                    spacing: 8
+                ) {
+                    ForEach(secondaryActions, id: \.self) { action in
+                        contextActionButton(action)
+                    }
+                }
             }
 
             HStack(spacing: 8) {
@@ -339,13 +356,14 @@ private struct DetailActionStack: View {
     }
 
     private func actionLabel(title: String, icon: String) -> some View {
-        HStack {
-            Spacer()
+        HStack(spacing: 7) {
             Image(systemName: icon).accessibilityHidden(true)
             Text(title)
-            Spacer()
+                .multilineTextAlignment(.center)
+                .lineLimit(2)
+                .minimumScaleFactor(0.78)
         }
-        .frame(height: 34)
+        .frame(maxWidth: .infinity, minHeight: 40)
     }
 
     private func compactButton(
