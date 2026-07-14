@@ -81,6 +81,67 @@ struct ClipboardRepositoryTests {
         #expect(newer.updatedAt == newerDate)
         #expect(results.map(\.id).prefix(2) == [newer.id, older.id])
     }
+
+    @Test("reclassifies stored Finder records without losing user metadata")
+    func reclassifiesStoredFinderRecords() throws {
+        let harness = try RepositoryHarness()
+        defer { harness.cleanup() }
+        let timestamp = Date(timeIntervalSince1970: 1_700_000_000)
+        let itemID = UUID(uuidString: "30000000-0000-4000-8000-000000000001")!
+        let fileURL = URL(fileURLWithPath: "/tmp/report.pdf")
+        let original = try harness.repository.upsert(
+            NormalizedCapture(
+                sourceAppName: "Finder",
+                sourceBundleID: "com.apple.finder",
+                kind: .mixed,
+                previewText: fileURL.path,
+                searchText: fileURL.path.lowercased(),
+                byteSize: fileURL.dataRepresentation.count + fileURL.path.utf8.count + 3,
+                contentHash: "legacy-finder-hash",
+                payloads: [
+                    NormalizedPayload(
+                        itemIndex: 0,
+                        type: "public.file-url",
+                        data: fileURL.dataRepresentation
+                    ),
+                    NormalizedPayload(
+                        itemIndex: 0,
+                        type: "public.utf8-plain-text",
+                        data: Data(fileURL.path.utf8)
+                    ),
+                    NormalizedPayload(
+                        itemIndex: 0,
+                        type: "com.apple.finder.node",
+                        data: Data([1, 2, 3])
+                    )
+                ]
+            ),
+            itemID: itemID,
+            timestamp: timestamp
+        )
+        try harness.repository.setFavorite(true, for: itemID)
+        try harness.repository.rename(itemID, title: "Quarterly Report")
+        let category = try harness.repository.createCategory(name: "Work")
+        try harness.repository.assign(itemID: itemID, categoryID: category.id)
+
+        let updatedCount = try harness.repository.reclassifyStoredItems(
+            using: ClipboardNormalizer(
+                maxRepresentationBytes: 25 * 1_024 * 1_024,
+                maxCaptureBytes: 100 * 1_024 * 1_024
+            )
+        )
+        let fetched = try harness.repository.item(id: itemID)
+        let repaired = try #require(fetched)
+
+        #expect(updatedCount == 1)
+        #expect(repaired.id == original.id)
+        #expect(repaired.kind == .file)
+        #expect(repaired.isFavorite)
+        #expect(repaired.customTitle == "Quarterly Report")
+        #expect(repaired.createdAt == timestamp)
+        #expect(repaired.contentHash == "legacy-finder-hash")
+        #expect(try harness.repository.categories(for: itemID).map(\.id) == [category.id])
+    }
 }
 
 private final class RepositoryHarness {

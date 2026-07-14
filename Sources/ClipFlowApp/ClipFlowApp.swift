@@ -69,6 +69,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 externalPayloadStore: externalStore,
                 externalThresholdBytes: settings.externalPayloadThresholdMB * 1_048_576
             )
+            let clipboardNormalizer = ClipboardNormalizer(
+                maxRepresentationBytes: 25 * 1_024 * 1_024,
+                maxCaptureBytes: 100 * 1_024 * 1_024
+            )
+            _ = try repository.reclassifyStoredItems(using: clipboardNormalizer)
             #if DEBUG
             if environment["CLIPFLOW_SEED_DEMO"] == "1",
                let developmentDataDirectory = environment["CLIPFLOW_DEVELOPMENT_DATA_DIR"],
@@ -172,10 +177,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 Task {
                     await monitor.start { capture in
                         do {
-                            let normalized = try ClipboardNormalizer(
-                                maxRepresentationBytes: 25 * 1_024 * 1_024,
-                                maxCaptureBytes: 100 * 1_024 * 1_024
-                            ).normalize(capture)
+                            let normalized = try clipboardNormalizer.normalize(capture)
                             _ = try repository.upsert(normalized)
                             await model.reload()
                         } catch ClipboardNormalizationError.noUsablePayload {

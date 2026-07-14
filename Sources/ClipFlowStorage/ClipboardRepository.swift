@@ -305,6 +305,60 @@ public final class ClipboardRepository: @unchecked Sendable {
         }
     }
 
+    @discardableResult
+    public func reclassifyStoredItems(
+        using normalizer: ClipboardNormalizer
+    ) throws -> Int {
+        let items = try database.query(
+            Self.itemSelect + " ORDER BY created_at, id;"
+        ).compactMap(Self.decodeItem)
+        var updatedCount = 0
+
+        for item in items {
+            let storedPayloads = try payloads(for: item.id)
+            let rawItems = Dictionary(grouping: storedPayloads, by: \.itemIndex)
+                .sorted { $0.key < $1.key }
+                .map { _, payloads in
+                    RawClipboardItem(
+                        representations: payloads.map {
+                            RawClipboardRepresentation(type: $0.type, data: $0.data)
+                        }
+                    )
+                }
+            guard !rawItems.isEmpty else { continue }
+
+            let normalized = try normalizer.normalize(
+                RawClipboardCapture(
+                    sourceAppName: item.appName,
+                    sourceBundleID: item.bundleID,
+                    items: rawItems
+                )
+            )
+            guard normalized.kind != item.kind ||
+                    normalized.previewText != item.previewText ||
+                    normalized.searchText != item.searchText else {
+                continue
+            }
+
+            try database.execute(
+                """
+                UPDATE clipboard_items
+                SET kind = ?, preview_text = ?, search_text = ?
+                WHERE id = ?;
+                """,
+                bindings: [
+                    .text(normalized.kind.rawValue),
+                    .text(normalized.previewText),
+                    .text(normalized.searchText),
+                    .text(item.id.uuidString)
+                ]
+            )
+            updatedCount += 1
+        }
+
+        return updatedCount
+    }
+
     private func externalReferences(for itemID: UUID) throws -> [ExternalPayloadReference] {
         try database.query(
             """

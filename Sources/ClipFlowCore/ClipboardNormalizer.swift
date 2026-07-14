@@ -1,5 +1,6 @@
 import CryptoKit
 import Foundation
+import UniformTypeIdentifiers
 
 public struct RawClipboardRepresentation: Equatable, Sendable {
     public let type: String
@@ -164,25 +165,102 @@ public struct ClipboardNormalizer: Sendable {
     }
 
     private static func aggregateKind(for payloads: [NormalizedPayload]) -> ClipboardKind {
-        let kinds = Set(payloads.map { kind(for: $0.type) })
-        return kinds.count == 1 ? kinds.first! : .mixed
+        let itemKinds = Dictionary(grouping: payloads, by: \.itemIndex)
+            .sorted { $0.key < $1.key }
+            .map { semanticKind(for: $0.value) }
+        let kinds = Set(itemKinds)
+        return kinds.count == 1 ? kinds.first ?? .unknown : .mixed
     }
 
-    private static func kind(for type: String) -> ClipboardKind {
-        switch type {
-        case "public.utf8-plain-text", "public.plain-text":
-            return .text
-        case "public.rtf", "public.html":
-            return .richText
-        case "public.url":
-            return .link
-        case "public.file-url":
-            return .file
-        case "public.png", "public.tiff", "public.jpeg", "public.webp", "com.adobe.pdf":
-            return .image
-        default:
-            return .unknown
+    private static func semanticKind(for payloads: [NormalizedPayload]) -> ClipboardKind {
+        if payloads.contains(where: isFileRepresentation) { return .file }
+        if payloads.contains(where: isURLRepresentation) { return .link }
+        if payloads.contains(where: isImageRepresentation) { return .image }
+        if payloads.contains(where: isRichTextRepresentation) { return .richText }
+
+        guard let text = decodedPlainText(in: payloads) else { return .unknown }
+        if inferredFileURL(from: text) != nil { return .file }
+        if inferredWebURL(from: text) != nil { return .link }
+        return .text
+    }
+
+    private static func isFileRepresentation(_ payload: NormalizedPayload) -> Bool {
+        if [
+            "public.file-url",
+            "NSFilenamesPboardType",
+            "com.apple.pasteboard.promised-file-url"
+        ].contains(payload.type) {
+            return true
         }
+        return UTType(payload.type)?.conforms(to: .fileURL) == true
+    }
+
+    private static func isURLRepresentation(_ payload: NormalizedPayload) -> Bool {
+        guard !isFileRepresentation(payload) else { return false }
+        if payload.type == "public.url" { return true }
+        return UTType(payload.type)?.conforms(to: .url) == true
+    }
+
+    private static func isImageRepresentation(_ payload: NormalizedPayload) -> Bool {
+        if ["com.adobe.pdf", "com.compuserve.gif"].contains(payload.type) {
+            return true
+        }
+        guard let type = UTType(payload.type) else { return false }
+        return type.conforms(to: .image) || type.conforms(to: .pdf)
+    }
+
+    private static func isRichTextRepresentation(_ payload: NormalizedPayload) -> Bool {
+        if ["public.rtf", "public.rtfd", "public.html"].contains(payload.type) {
+            return true
+        }
+        guard let type = UTType(payload.type) else { return false }
+        return type.conforms(to: .rtf) || type.conforms(to: .html)
+    }
+
+    private static func decodedPlainText(in payloads: [NormalizedPayload]) -> String? {
+        let preferredTypes = [
+            "public.utf8-plain-text",
+            "public.plain-text",
+            "public.utf16-plain-text",
+            "public.utf16-external-plain-text"
+        ]
+        let candidates = preferredTypes.compactMap { preferred in
+            payloads.first { $0.type == preferred }
+        } + payloads.filter { payload in
+            UTType(payload.type)?.conforms(to: .plainText) == true &&
+                !preferredTypes.contains(payload.type)
+        }
+
+        for payload in candidates {
+            if let value = String(data: payload.data, encoding: .utf8)
+                ?? String(data: payload.data, encoding: .utf16) {
+                return normalizeLineEndings(value)
+            }
+        }
+        return nil
+    }
+
+    private static func inferredWebURL(from text: String) -> URL? {
+        let value = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !value.isEmpty,
+              !value.contains(where: \.isWhitespace),
+              let url = URL(string: value),
+              let scheme = url.scheme?.lowercased(),
+              ["http", "https", "mailto"].contains(scheme) else {
+            return nil
+        }
+        return url
+    }
+
+    private static func inferredFileURL(from text: String) -> URL? {
+        let value = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !value.isEmpty,
+              !value.contains(where: \.isWhitespace),
+              let url = URL(string: value),
+              url.isFileURL else {
+            return nil
+        }
+        return url
     }
 
     private static func contentHash(for payloads: [NormalizedPayload]) -> String {
