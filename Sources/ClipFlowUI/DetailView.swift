@@ -337,34 +337,30 @@ private struct DetailActionStack: View {
         prominent: Bool,
         action: @escaping () -> Void
     ) -> some View {
-        if prominent {
-            Button(action: action) {
-                actionLabel(title: title, icon: icon)
-            }
-            .buttonStyle(.borderedProminent)
-            .controlSize(.large)
-            .accessibilityLabel(title)
-            .help(title)
-        } else {
-            Button(action: action) {
-                actionLabel(title: title, icon: icon)
-            }
-            .buttonStyle(.bordered)
-            .controlSize(.large)
-            .accessibilityLabel(title)
-            .help(title)
+        Button(action: action) {
+            actionLabel(title: title, icon: icon)
         }
+        .buttonStyle(
+            DetailActionButtonStyle(
+                kind: prominent ? .primary : .secondary
+            )
+        )
+        .accessibilityLabel(title)
+        .help(title)
     }
 
     private func actionLabel(title: String, icon: String) -> some View {
-        HStack(spacing: 7) {
-            Image(systemName: icon).accessibilityHidden(true)
+        HStack(spacing: 8) {
+            Image(systemName: icon)
+                .font(.system(size: 14, weight: .medium))
+                .accessibilityHidden(true)
             Text(title)
                 .multilineTextAlignment(.center)
-                .lineLimit(2)
-                .minimumScaleFactor(0.78)
+                .lineLimit(1)
+                .minimumScaleFactor(0.74)
         }
-        .frame(maxWidth: .infinity, minHeight: 40)
+        .padding(.horizontal, 10)
+        .frame(maxWidth: .infinity)
     }
 
     private func compactButton(
@@ -375,11 +371,89 @@ private struct DetailActionStack: View {
     ) -> some View {
         Button(role: role, action: action) {
             Image(systemName: icon)
+                .font(.system(size: 14, weight: .medium))
                 .frame(maxWidth: .infinity)
                 .accessibilityHidden(true)
         }
-        .buttonStyle(.bordered)
+        .buttonStyle(DetailActionButtonStyle(kind: .utility, role: role))
         .accessibilityLabel(title)
         .help(title)
+    }
+}
+
+private enum DetailActionButtonKind {
+    case primary
+    case secondary
+    case utility
+
+    var height: CGFloat {
+        switch self {
+        case .primary: ClipFlowVisualStyle.primaryActionHeight
+        case .secondary: ClipFlowVisualStyle.secondaryActionHeight
+        case .utility: ClipFlowVisualStyle.utilityActionHeight
+        }
+    }
+
+    var cornerRadius: CGFloat {
+        switch self {
+        case .primary: 12
+        case .secondary: 10
+        case .utility: 8
+        }
+    }
+}
+
+private struct DetailActionButtonStyle: ButtonStyle {
+    let kind: DetailActionButtonKind
+    var role: ButtonRole?
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(kind == .utility ? .callout : .callout.weight(.medium))
+            .foregroundStyle(foregroundStyle)
+            .frame(maxWidth: .infinity)
+            .frame(height: kind.height)
+            .background {
+                RoundedRectangle(cornerRadius: kind.cornerRadius, style: .continuous)
+                    .fill(backgroundStyle)
+            }
+            .overlay {
+                RoundedRectangle(cornerRadius: kind.cornerRadius, style: .continuous)
+                    .stroke(borderColor, lineWidth: kind == .primary ? 0 : 1)
+            }
+            .contentShape(
+                RoundedRectangle(cornerRadius: kind.cornerRadius, style: .continuous)
+            )
+            .opacity(configuration.isPressed ? 0.78 : 1)
+            .scaleEffect(configuration.isPressed ? 0.985 : 1)
+            .animation(.easeOut(duration: 0.12), value: configuration.isPressed)
+    }
+
+    private var foregroundStyle: Color {
+        if kind == .primary { return .white }
+        if role == .destructive { return .red }
+        return .primary
+    }
+
+    private var backgroundStyle: AnyShapeStyle {
+        switch kind {
+        case .primary:
+            AnyShapeStyle(Color.accentColor)
+        case .secondary:
+            AnyShapeStyle(.thinMaterial)
+        case .utility:
+            AnyShapeStyle(Color.primary.opacity(0.085))
+        }
+    }
+
+    private var borderColor: Color {
+        switch kind {
+        case .primary:
+            .clear
+        case .secondary:
+            ClipFlowVisualStyle.hairlineColor.opacity(0.75)
+        case .utility:
+            ClipFlowVisualStyle.hairlineColor.opacity(0.5)
+        }
     }
 }
