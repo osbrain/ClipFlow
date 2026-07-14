@@ -6,4 +6,5 @@ xcuserdata/
 *.xcuserstate
 .swiftpm/
 .superpowers/
+.worktrees/
 artifacts/
