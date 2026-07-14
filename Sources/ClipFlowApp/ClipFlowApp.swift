@@ -631,7 +631,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             backing: .buffered,
             defer: false
         )
-        window.title = L10n.string("settings.window.title")
         window.minSize = NSSize(width: 560, height: 520)
         window.isReleasedWhenClosed = false
         SettingsWindowAppearance.apply(to: window)

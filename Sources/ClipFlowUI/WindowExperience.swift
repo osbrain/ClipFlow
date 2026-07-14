@@ -15,6 +15,7 @@ public enum SettingsWindowAppearance {
 
     public static func apply(to window: NSWindow) {
         window.styleMask.remove(.fullSizeContentView)
+        window.title = ""
         window.backgroundColor = .clear
         window.isOpaque = false
         window.titlebarAppearsTransparent = true

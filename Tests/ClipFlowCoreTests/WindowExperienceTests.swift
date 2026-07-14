@@ -46,10 +46,12 @@ struct WindowExperienceTests {
             backing: .buffered,
             defer: false
         )
+        window.title = "ClipFlow Settings"
 
         SettingsWindowAppearance.apply(to: window)
 
         #expect(!window.styleMask.contains(.fullSizeContentView))
+        #expect(window.title.isEmpty)
         #expect(window.titlebarAppearsTransparent)
         #expect(!window.isOpaque)
         #expect(window.backgroundColor == .clear)

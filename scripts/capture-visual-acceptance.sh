@@ -222,6 +222,12 @@ for candidate in candidates {
             && mainWidth.map { candidate.width < $0 } != false
             && mainHeight.map { candidate.height < $0 } != false
             && !candidate.title.localizedCaseInsensitiveContains("ClipFlow Settings")
+    } else if selector == "__SETTINGS__" {
+        titleMatches = candidate.layer == 0
+            && candidate.width >= 560
+            && candidate.width <= 660
+            && candidate.height >= 520
+            && candidate.height <= 760
     } else {
         titleMatches = selector.isEmpty
             || candidate.title.localizedCaseInsensitiveContains(selector)
@@ -425,10 +431,10 @@ capture_scenario \
 capture_scenario \
     "light-en-compact" "en" "en_US" "light" "compact" 800 520 "" 1
 capture_scenario \
-    "light-en-settings" "en" "en_US" "light" "comfortable" 1000 680 "ClipFlow Settings" 0 \
+    "light-en-settings" "en" "en_US" "light" "comfortable" 1000 680 "__SETTINGS__" 0 \
     "CLIPFLOW_SHOW_SETTINGS=1"
 capture_scenario \
-    "dark-zh-settings" "zh-Hans" "zh_CN" "dark" "comfortable" 1000 680 "ClipFlow 设置" 0 \
+    "dark-zh-settings" "zh-Hans" "zh_CN" "dark" "comfortable" 1000 680 "__SETTINGS__" 0 \
     "CLIPFLOW_SHOW_SETTINGS=1"
 capture_scenario \
     "light-en-file-actions" "en" "en_US" "light" "comfortable" 1000 680 "" 1 \
