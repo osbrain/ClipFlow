@@ -156,6 +156,33 @@ struct AppModelTests {
         #expect(integrations.performedActions.first?.1 == item.id)
     }
 
+    @Test("routes content-specific actions and keeps failures visible")
+    func routesContextActions() async {
+        let item = Self.item(preview: "https://example.com", kind: .link)
+        let repository = FakeHistoryRepository(items: [item])
+        let integrations = FakeItemIntegrationService()
+        integrations.contextActions = [.pasteOriginal, .openLink, .pastePlainText]
+        let model = AppModel(
+            repository: repository,
+            pasteService: FakePasteService(),
+            itemIntegrations: integrations
+        )
+        await model.reload()
+
+        #expect(model.availableContextActions == [
+            .pasteOriginal, .openLink, .pastePlainText
+        ])
+        await model.performContextAction(.openLink)
+        #expect(integrations.performedContextActions == [
+            PerformedContextAction(action: .openLink, itemID: item.id)
+        ])
+
+        integrations.shouldFailContextAction = true
+        await model.performContextAction(.openLink)
+        #expect(model.errorMessage == L10n.string("error.contextAction"))
+        #expect(model.selectedItemID == item.id)
+    }
+
     @Test("reload publishes metadata visuals without loading thumbnails")
     func reloadPublishesMetadataVisuals() async throws {
         let item = Self.item(preview: "Visual")
@@ -295,10 +322,14 @@ struct AppModelTests {
         #expect(thumbnail.size.width == 29)
     }
 
-    private static func item(id: UUID = UUID(), preview: String) -> ClipboardItem {
+    private static func item(
+        id: UUID = UUID(),
+        preview: String,
+        kind: ClipboardKind = .text
+    ) -> ClipboardItem {
         ClipboardItem(
             id: id, createdAt: .distantPast, updatedAt: .distantPast,
-            appName: "Notes", bundleID: "com.apple.Notes", kind: .text,
+            appName: "Notes", bundleID: "com.apple.Notes", kind: kind,
             previewText: preview, searchText: preview.lowercased(),
             byteSize: preview.utf8.count, contentHash: preview,
             isFavorite: false, lastUsedAt: nil, customTitle: nil,
@@ -419,6 +450,9 @@ private struct FakePasteRequest: Equatable, Sendable {
 private final class FakeItemIntegrationService: ItemIntegrationServing {
     private(set) var previewedIDs: [UUID] = []
     private(set) var performedActions: [(ApplicationAction, UUID)] = []
+    var contextActions: [ItemContextAction] = []
+    var shouldFailContextAction = false
+    private(set) var performedContextActions: [PerformedContextAction] = []
 
     func availableActions(for item: ClipboardItem) -> [ApplicationAction] {
         [.openFeishu]
@@ -428,6 +462,10 @@ private final class FakeItemIntegrationService: ItemIntegrationServing {
         previewedIDs.append(item.id)
     }
 
+    func availableContextActions(for item: ClipboardItem) -> [ItemContextAction] {
+        contextActions
+    }
+
     func dragProvider(for item: ClipboardItem) -> NSItemProvider? {
         nil
     }
@@ -435,6 +473,24 @@ private final class FakeItemIntegrationService: ItemIntegrationServing {
     func perform(_ action: ApplicationAction, for item: ClipboardItem) async throws {
         performedActions.append((action, item.id))
     }
+
+    func perform(_ action: ItemContextAction, for item: ClipboardItem) throws {
+        if shouldFailContextAction {
+            throw FakeContextActionError.failed
+        }
+        performedContextActions.append(
+            PerformedContextAction(action: action, itemID: item.id)
+        )
+    }
+}
+
+private struct PerformedContextAction: Equatable {
+    let action: ItemContextAction
+    let itemID: UUID
+}
+
+private enum FakeContextActionError: Error {
+    case failed
 }
 
 @MainActor

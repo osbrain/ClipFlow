@@ -7,9 +7,8 @@ struct DetailView: View {
     let item: ClipboardItem?
     let visual: ClipboardVisualDescriptor?
     let settings: SettingsModel
-    let paste: () -> Void
-    let pasteAsPlainText: () -> Void
-    let preview: () -> Void
+    let contextActions: [ItemContextAction]
+    let performContextAction: (ItemContextAction) -> Void
     let favorite: () -> Void
     let rename: () -> Void
     let delete: () -> Void
@@ -26,9 +25,8 @@ struct DetailView: View {
                         metadataGrid(for: item)
                         DetailActionStack(
                             item: item,
-                            paste: paste,
-                            pasteAsPlainText: pasteAsPlainText,
-                            preview: preview,
+                            contextActions: contextActions,
+                            performContextAction: performContextAction,
                             favorite: favorite,
                             rename: rename,
                             delete: delete,
@@ -253,9 +251,8 @@ private struct PreviewCard: View {
 
 private struct DetailActionStack: View {
     let item: ClipboardItem
-    let paste: () -> Void
-    let pasteAsPlainText: () -> Void
-    let preview: () -> Void
+    let contextActions: [ItemContextAction]
+    let performContextAction: (ItemContextAction) -> Void
     let favorite: () -> Void
     let rename: () -> Void
     let delete: () -> Void
@@ -263,65 +260,56 @@ private struct DetailActionStack: View {
     let performApplicationAction: (ApplicationAction) -> Void
 
     var body: some View {
-        GeometryReader { proxy in
-            let showsLabels = proxy.size.width >= 330
-            VStack(spacing: 9) {
-                actionButton(
-                    L10n.string("detail.paste"),
-                    icon: "arrow.down.doc",
-                    prominent: true,
-                    showsLabel: showsLabels,
-                    action: paste
+        VStack(spacing: 9) {
+            ForEach(contextActions, id: \.self) { action in
+                contextActionButton(action)
+            }
+
+            HStack(spacing: 8) {
+                compactButton(
+                    L10n.string(item.isFavorite ? "action.removeFavorite" : "action.favorite"),
+                    icon: item.isFavorite ? "star.fill" : "star",
+                    action: favorite
                 )
-                .keyboardShortcut(.return, modifiers: [])
+                compactButton(L10n.string("action.rename"), icon: "pencil", action: rename)
+                compactButton(
+                    L10n.string("action.delete"),
+                    icon: "trash",
+                    role: .destructive,
+                    action: delete
+                )
+            }
 
-                if supportsPlainTextPaste {
-                    actionButton(
-                        plainTextLabel,
-                        icon: item.kind == .file ? "point.topleft.down.to.point.bottomright.curvepath" : "textformat",
-                        prominent: false,
-                        showsLabel: showsLabels,
-                        action: pasteAsPlainText
-                    )
-                    .keyboardShortcut(.return, modifiers: .command)
-                }
-
-                HStack(spacing: 8) {
-                    compactButton(L10n.string("detail.preview"), icon: "eye", action: preview)
-                    compactButton(L10n.string(item.isFavorite ? "action.removeFavorite" : "action.favorite"), icon: item.isFavorite ? "star.fill" : "star", action: favorite)
-                    compactButton(L10n.string("action.rename"), icon: "pencil", action: rename)
-                    compactButton(L10n.string("action.delete"), icon: "trash", role: .destructive, action: delete)
-                }
-
-                ForEach(applicationActions, id: \.self) { applicationAction in
-                    actionButton(
-                        applicationAction.localizedDisplayName,
-                        icon: applicationAction.symbolName,
-                        prominent: false,
-                        showsLabel: true
-                    ) {
-                        performApplicationAction(applicationAction)
-                    }
+            ForEach(applicationActions, id: \.self) { applicationAction in
+                actionButton(
+                    applicationAction.localizedDisplayName,
+                    icon: applicationAction.symbolName,
+                    prominent: false
+                ) {
+                    performApplicationAction(applicationAction)
                 }
             }
         }
-        .frame(height: actionStackHeight)
     }
 
-    private var supportsPlainTextPaste: Bool {
-        switch item.kind {
-        case .text, .richText, .link, .file, .mixed: true
-        case .image, .unknown: false
+    @ViewBuilder
+    private func contextActionButton(_ action: ItemContextAction) -> some View {
+        let title = L10n.string(action.titleKey(for: item.kind))
+        if action == .pasteOriginal {
+            actionButton(title, icon: action.symbolName, prominent: true) {
+                performContextAction(action)
+            }
+            .keyboardShortcut(.return, modifiers: [])
+        } else if action == .pastePlainText || action == .pasteFilePath {
+            actionButton(title, icon: action.symbolName, prominent: false) {
+                performContextAction(action)
+            }
+            .keyboardShortcut(.return, modifiers: .command)
+        } else {
+            actionButton(title, icon: action.symbolName, prominent: false) {
+                performContextAction(action)
+            }
         }
-    }
-
-    private var plainTextLabel: String {
-        L10n.string(item.kind == .file ? "detail.pasteFilePath" : "detail.pastePlainText")
-    }
-
-    private var actionStackHeight: CGFloat {
-        let base = supportsPlainTextPaste ? 148.0 : 98.0
-        return base + CGFloat(applicationActions.count * 48)
     }
 
     @ViewBuilder
@@ -329,12 +317,11 @@ private struct DetailActionStack: View {
         _ title: String,
         icon: String,
         prominent: Bool,
-        showsLabel: Bool,
         action: @escaping () -> Void
     ) -> some View {
         if prominent {
             Button(action: action) {
-                actionLabel(title: title, icon: icon, showsLabel: showsLabel)
+                actionLabel(title: title, icon: icon)
             }
             .buttonStyle(.borderedProminent)
             .controlSize(.large)
@@ -342,7 +329,7 @@ private struct DetailActionStack: View {
             .help(title)
         } else {
             Button(action: action) {
-                actionLabel(title: title, icon: icon, showsLabel: showsLabel)
+                actionLabel(title: title, icon: icon)
             }
             .buttonStyle(.bordered)
             .controlSize(.large)
@@ -351,11 +338,11 @@ private struct DetailActionStack: View {
         }
     }
 
-    private func actionLabel(title: String, icon: String, showsLabel: Bool) -> some View {
+    private func actionLabel(title: String, icon: String) -> some View {
         HStack {
             Spacer()
             Image(systemName: icon).accessibilityHidden(true)
-            if showsLabel { Text(title) }
+            Text(title)
             Spacer()
         }
         .frame(height: 34)

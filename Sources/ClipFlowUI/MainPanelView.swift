@@ -167,9 +167,10 @@ public struct MainPanelView: View {
                 item: model.selectedItem,
                 visual: model.selectedItemID.flatMap { model.visuals[$0] },
                 settings: settings,
-                paste: { Task { await model.pasteSelection() } },
-                pasteAsPlainText: { Task { await model.pasteSelectionAsPlainText() } },
-                preview: { model.previewSelection() },
+                contextActions: model.availableContextActions,
+                performContextAction: { action in
+                    Task { await model.performContextAction(action) }
+                },
                 favorite: { Task { await model.toggleFavoriteSelection() } },
                 rename: beginRename,
                 delete: beginDelete,

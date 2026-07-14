@@ -29,6 +29,7 @@
 "error.category.assign" = "无法分配分类。";
 "error.category.delete" = "无法删除分类。";
 "error.browser.activate" = "无法激活浏览器标签页。";
+"error.contextAction" = "无法对所选内容执行此操作。";
 "history.search.placeholder" = "搜索内容、应用、链接、文件和浏览器标签页";
 "history.empty.title" = "暂无剪贴板内容";
 "history.empty.description" = "复制的内容会显示在这里。";
@@ -70,6 +71,19 @@
 "detail.unavailable" = "不可用";
 "detail.pastePlainText" = "以纯文本粘贴";
 "detail.pasteFilePath" = "粘贴文件路径";
+"contextAction.pasteOriginal.text" = "粘贴文本";
+"contextAction.pasteOriginal.richText" = "保留格式粘贴";
+"contextAction.pasteOriginal.image" = "粘贴图片或 PDF";
+"contextAction.pasteOriginal.file" = "粘贴文件";
+"contextAction.pasteOriginal.link" = "粘贴链接";
+"contextAction.pasteOriginal.mixed" = "粘贴原始内容";
+"contextAction.pasteOriginal.unknown" = "粘贴原始内容";
+"contextAction.pastePlainText" = "以纯文本粘贴";
+"contextAction.pasteFilePath" = "粘贴文件路径";
+"contextAction.openLink" = "在默认浏览器中打开";
+"contextAction.openFile" = "打开文件";
+"contextAction.revealInFinder" = "在 Finder 中显示";
+"contextAction.quickLook" = "快速预览";
 "detail.empty.title" = "未选择条目";
 "detail.empty.description" = "选择一个剪贴板条目以查看详情。";
 "browser.refresh" = "刷新标签页";

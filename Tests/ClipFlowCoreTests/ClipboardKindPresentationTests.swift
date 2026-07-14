@@ -92,8 +92,22 @@ struct ClipboardKindPresentationTests {
             "error.category.assign",
             "error.category.delete",
             "error.browser.activate",
+            "error.contextAction",
             "action.feishu",
-            "action.doubao"
+            "action.doubao",
+            "contextAction.pasteOriginal.text",
+            "contextAction.pasteOriginal.richText",
+            "contextAction.pasteOriginal.image",
+            "contextAction.pasteOriginal.file",
+            "contextAction.pasteOriginal.link",
+            "contextAction.pasteOriginal.mixed",
+            "contextAction.pasteOriginal.unknown",
+            "contextAction.pastePlainText",
+            "contextAction.pasteFilePath",
+            "contextAction.openLink",
+            "contextAction.openFile",
+            "contextAction.revealInFinder",
+            "contextAction.quickLook"
         ]
 
         for key in keys {

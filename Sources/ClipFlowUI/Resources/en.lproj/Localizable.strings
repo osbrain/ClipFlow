@@ -29,6 +29,7 @@
 "error.category.assign" = "Unable to assign category.";
 "error.category.delete" = "Unable to delete category.";
 "error.browser.activate" = "Unable to activate browser tab.";
+"error.contextAction" = "Unable to perform this action for the selected item.";
 "history.search.placeholder" = "Search content, apps, links, files, and browser tabs";
 "history.empty.title" = "No Clipboard Items";
 "history.empty.description" = "Copied content will appear here.";
@@ -70,6 +71,19 @@
 "detail.unavailable" = "Not Available";
 "detail.pastePlainText" = "Paste as Plain Text";
 "detail.pasteFilePath" = "Paste File Path";
+"contextAction.pasteOriginal.text" = "Paste Text";
+"contextAction.pasteOriginal.richText" = "Paste with Formatting";
+"contextAction.pasteOriginal.image" = "Paste Image or PDF";
+"contextAction.pasteOriginal.file" = "Paste File";
+"contextAction.pasteOriginal.link" = "Paste Link";
+"contextAction.pasteOriginal.mixed" = "Paste Original Content";
+"contextAction.pasteOriginal.unknown" = "Paste Original Content";
+"contextAction.pastePlainText" = "Paste as Plain Text";
+"contextAction.pasteFilePath" = "Paste File Path";
+"contextAction.openLink" = "Open in Default Browser";
+"contextAction.openFile" = "Open File";
+"contextAction.revealInFinder" = "Show in Finder";
+"contextAction.quickLook" = "Quick Look";
 "detail.empty.title" = "No Item Selected";
 "detail.empty.description" = "Select a clipboard item to view its details.";
 "browser.refresh" = "Refresh Tabs";

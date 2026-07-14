@@ -32,9 +32,11 @@ public extension PasteServing {
 @MainActor
 public protocol ItemIntegrationServing: AnyObject {
     func availableActions(for item: ClipboardItem) -> [ApplicationAction]
+    func availableContextActions(for item: ClipboardItem) -> [ItemContextAction]
     func preview(_ item: ClipboardItem) throws
     func dragProvider(for item: ClipboardItem) -> NSItemProvider?
     func perform(_ action: ApplicationAction, for item: ClipboardItem) async throws
+    func perform(_ action: ItemContextAction, for item: ClipboardItem) throws
 }
 
 @MainActor
@@ -89,6 +91,12 @@ public final class AppModel {
         return itemIntegrations.availableActions(for: selectedItem)
     }
 
+    public var availableContextActions: [ItemContextAction] {
+        guard let selectedItem else { return [] }
+        return itemIntegrations?.availableContextActions(for: selectedItem)
+            ?? ItemContextAction.available(for: selectedItem.kind)
+    }
+
     public func applicationActions(for item: ClipboardItem) -> [ApplicationAction] {
         itemIntegrations?.availableActions(for: item) ?? []
     }
@@ -114,6 +122,28 @@ public final class AppModel {
             errorMessage = nil
         } catch {
             errorMessage = L10n.format("error.action", action.localizedDisplayName)
+        }
+    }
+
+    public func performContextAction(_ action: ItemContextAction) async {
+        switch action {
+        case .pasteOriginal:
+            await pasteSelection()
+        case .pastePlainText, .pasteFilePath:
+            await pasteSelectionAsPlainText()
+        case .quickLook:
+            previewSelection()
+        case .openLink, .openFile, .revealInFinder:
+            guard let selectedItem, let itemIntegrations else {
+                errorMessage = L10n.string("error.contextAction")
+                return
+            }
+            do {
+                try itemIntegrations.perform(action, for: selectedItem)
+                errorMessage = nil
+            } catch {
+                errorMessage = L10n.string("error.contextAction")
+            }
         }
     }
 
