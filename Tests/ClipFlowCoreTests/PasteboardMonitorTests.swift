@@ -14,16 +14,16 @@ struct PasteboardMonitorTests {
             interval: .milliseconds(10)
         )
 
-        await monitor.start { capture in
+        board.setText("first", changeCount: 2)
+        await monitor.pollOnce { capture in
             await recorder.append(capture)
         }
-        board.setText("first", changeCount: 2)
-        try await Task.sleep(for: .milliseconds(40))
 
         await monitor.ignoreNextChange(expectedChangeCount: 3)
         board.setText("internal", changeCount: 3)
-        try await Task.sleep(for: .milliseconds(40))
-        await monitor.stop()
+        await monitor.pollOnce { capture in
+            await recorder.append(capture)
+        }
 
         #expect(await recorder.count == 1)
         #expect(await recorder.lastText == "first")

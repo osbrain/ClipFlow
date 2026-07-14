@@ -54,11 +54,11 @@ public actor PasteboardMonitor {
             } catch {
                 return
             }
-            await poll(handler: handler)
+            await pollOnce(handler: handler)
         }
     }
 
-    private func poll(handler: @escaping CaptureHandler) async {
+    func pollOnce(handler: @escaping CaptureHandler) async {
         guard !isPaused else { return }
         let currentChangeCount = pasteboard.changeCount
         guard currentChangeCount != lastChangeCount else { return }
@@ -75,4 +75,3 @@ public actor PasteboardMonitor {
         }
     }
 }
-

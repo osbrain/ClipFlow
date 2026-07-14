@@ -49,7 +49,11 @@ public struct SettingsView: View {
         .environment(\.locale, L10n.locale)
         .onChange(of: snapshot) { previous, current in
             model.save()
-            onRuntimeSettingsChange(previous.runtimeSnapshot, current.runtimeSnapshot)
+            let previousRuntime = previous.runtimeSnapshot
+            let currentRuntime = current.runtimeSnapshot
+            if previousRuntime != currentRuntime {
+                onRuntimeSettingsChange(previousRuntime, currentRuntime)
+            }
         }
         .task {
             await model.refreshPermissions()
