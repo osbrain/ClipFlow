@@ -45,10 +45,12 @@ public struct OnboardingView: View {
             HStack {
                 if !settings.isAccessibilityTrusted {
                     Button(L10n.string("onboarding.accessibilitySettings")) {
-                        guard let url = URL(
-                            string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility"
-                        ) else { return }
-                        NSWorkspace.shared.open(url)
+                        Task {
+                            await settings.requestAccessibilityAuthorization()
+                            if !settings.isAccessibilityTrusted {
+                                Self.openAccessibilitySettings()
+                            }
+                        }
                     }
                 }
                 Spacer()
@@ -62,6 +64,13 @@ public struct OnboardingView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(.regularMaterial)
         .task { await settings.refreshPermissions() }
+    }
+
+    private static func openAccessibilitySettings() {
+        guard let url = URL(
+            string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility"
+        ) else { return }
+        NSWorkspace.shared.open(url)
     }
 
     private func permissionRow(

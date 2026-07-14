@@ -146,6 +146,23 @@ struct SettingsModelTests {
         #expect(model.isAccessibilityTrusted)
     }
 
+    @Test("requesting Accessibility prompts once and refreshes permission state")
+    func requestsAccessibilityAuthorization() async {
+        let permissions = FakePermissionStatus(
+            accessibilityTrusted: false,
+            grantsOnRequest: true
+        )
+        let model = SettingsModel(
+            store: MemorySettingsStore(),
+            permissions: permissions
+        )
+
+        await model.requestAccessibilityAuthorization()
+
+        #expect(permissions.requestCount == 1)
+        #expect(model.isAccessibilityTrusted)
+    }
+
     @Test("persists appearance and density preferences")
     func persistsAppearanceAndDensityPreferences() {
         let store = MemorySettingsStore()
@@ -285,9 +302,12 @@ private final class AccuratePresenceSettingsStore: SettingsStoring, @unchecked S
 private final class FakePermissionStatus: PermissionStatusProviding, @unchecked Sendable {
     private let lock = NSLock()
     private var trusted: Bool
+    private let grantsOnRequest: Bool
+    private var requests = 0
 
-    init(accessibilityTrusted: Bool) {
+    init(accessibilityTrusted: Bool, grantsOnRequest: Bool = false) {
         trusted = accessibilityTrusted
+        self.grantsOnRequest = grantsOnRequest
     }
 
     var accessibilityTrusted: Bool {
@@ -297,5 +317,19 @@ private final class FakePermissionStatus: PermissionStatusProviding, @unchecked 
 
     func isAccessibilityTrusted() -> Bool {
         accessibilityTrusted
+    }
+
+    var requestCount: Int {
+        lock.withLock { requests }
+    }
+
+    func requestAccessibilityAuthorization() -> Bool {
+        lock.withLock {
+            requests += 1
+            if grantsOnRequest {
+                trusted = true
+            }
+            return trusted
+        }
     }
 }

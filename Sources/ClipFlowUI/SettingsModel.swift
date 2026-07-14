@@ -1,4 +1,4 @@
-import ApplicationServices
+@preconcurrency import ApplicationServices
 import ClipFlowCore
 import ClipFlowSystem
 import Foundation
@@ -20,11 +20,19 @@ extension UserDefaults: SettingsStoring {
 
 public protocol PermissionStatusProviding: Sendable {
     func isAccessibilityTrusted() -> Bool
+    func requestAccessibilityAuthorization() -> Bool
 }
 
 public struct SystemPermissionStatus: PermissionStatusProviding {
     public init() {}
     public func isAccessibilityTrusted() -> Bool { AXIsProcessTrusted() }
+
+    public func requestAccessibilityAuthorization() -> Bool {
+        let promptKey = kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String
+        return AXIsProcessTrustedWithOptions(
+            [promptKey: true] as CFDictionary
+        )
+    }
 }
 
 public enum RetentionPreference: String, CaseIterable, Sendable {
@@ -147,6 +155,11 @@ public final class SettingsModel {
     }
 
     public func refreshPermissions() async {
+        isAccessibilityTrusted = permissions.isAccessibilityTrusted()
+    }
+
+    public func requestAccessibilityAuthorization() async {
+        _ = permissions.requestAccessibilityAuthorization()
         isAccessibilityTrusted = permissions.isAccessibilityTrusted()
     }
 

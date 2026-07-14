@@ -55,7 +55,7 @@ public enum L10n {
             language: configuredLanguageSnapshot,
             preferredLanguages: Locale.preferredLanguages
         ) else {
-            return Bundle.module.localizedString(forKey: key, value: key, table: nil)
+            return resourceBundle.localizedString(forKey: key, value: key, table: nil)
         }
         return string(key, locale: identifier)
     }
@@ -66,8 +66,8 @@ public enum L10n {
         let candidates = [identifier, normalizedIdentifier, languageIdentifier]
             .compactMap { $0 }
         let path = candidates.lazy.compactMap {
-            Bundle.module.path(forResource: $0, ofType: "lproj")
-                ?? Bundle.module.path(forResource: $0.lowercased(), ofType: "lproj")
+            resourceBundle.path(forResource: $0, ofType: "lproj")
+                ?? resourceBundle.path(forResource: $0.lowercased(), ofType: "lproj")
         }.first
 
         guard let path,
@@ -95,7 +95,7 @@ public enum L10n {
             language: language,
             preferredLanguages: preferredLanguages
         ) else {
-            return Bundle.module.localizedString(forKey: key, value: key, table: nil)
+            return resourceBundle.localizedString(forKey: key, value: key, table: nil)
         }
         return string(key, locale: identifier)
     }
@@ -128,7 +128,7 @@ public enum L10n {
 
     static func string(_ key: String, environment: [String: String]) -> String {
         guard let identifier = environmentLocaleIdentifier(environment) else {
-            return Bundle.module.localizedString(forKey: key, value: key, table: nil)
+            return resourceBundle.localizedString(forKey: key, value: key, table: nil)
         }
         return string(key, locale: identifier)
     }
@@ -159,6 +159,15 @@ public enum L10n {
 
     private static var configuredLanguageSnapshot: AppLanguage {
         languageLock.withLock { configuredLanguage }
+    }
+
+    private static var resourceBundle: Bundle {
+        if let resourceURL = Bundle.main.resourceURL?
+            .appendingPathComponent("ClipFlow_ClipFlowUI.bundle", isDirectory: true),
+           let packagedBundle = Bundle(url: resourceURL) {
+            return packagedBundle
+        }
+        return Bundle.module
     }
 
     private static func effectiveLocaleIdentifier(

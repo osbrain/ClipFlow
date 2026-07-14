@@ -189,7 +189,14 @@ public struct SettingsView: View {
                     .font(.callout.weight(.medium))
                     .foregroundStyle(model.isAccessibilityTrusted ? .green : .secondary)
 
-                    Button(action: Self.openAccessibilitySettings) {
+                    Button {
+                        Task {
+                            await model.requestAccessibilityAuthorization()
+                            if !model.isAccessibilityTrusted {
+                                Self.openAccessibilitySettings()
+                            }
+                        }
+                    } label: {
                         Label(L10n.string("settings.openSystemSettings"), systemImage: "arrow.up.forward.app")
                     }
                     .buttonStyle(.bordered)
