@@ -38,7 +38,7 @@ struct WindowExperienceTests {
         )
     }
 
-    @Test("settings window uses an opaque native title bar outside its content layout")
+    @Test("settings window keeps its title bar in the layout while using material")
     func settingsWindowAppearance() {
         let window = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: 640, height: 700),
@@ -50,9 +50,31 @@ struct WindowExperienceTests {
         SettingsWindowAppearance.apply(to: window)
 
         #expect(!window.styleMask.contains(.fullSizeContentView))
-        #expect(!window.titlebarAppearsTransparent)
-        #expect(window.isOpaque)
-        #expect(window.backgroundColor == .windowBackgroundColor)
+        #expect(window.titlebarAppearsTransparent)
+        #expect(!window.isOpaque)
+        #expect(window.backgroundColor == .clear)
+    }
+
+    @Test("settings window installs content material beneath its title bar")
+    func settingsWindowMaterial() {
+        let window = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 640, height: 700),
+            styleMask: [.titled, .closable, .resizable],
+            backing: .buffered,
+            defer: false
+        )
+        window.contentView = NSView()
+
+        SettingsWindowAppearance.installMaterial(in: window)
+
+        let materialView = window.contentView?.superview?.subviews
+            .compactMap { $0 as? NSVisualEffectView }
+            .first { $0.identifier == SettingsWindowAppearance.materialIdentifier }
+        #expect(materialView?.material == .underWindowBackground)
+        #expect(materialView?.blendingMode == .withinWindow)
+        #expect(materialView?.state == .active)
+        #expect(materialView?.autoresizingMask.contains(.width) == true)
+        #expect(materialView?.autoresizingMask.contains(.height) == true)
     }
 
     @Test("overlay scroll indicators stay four points thick in both orientations")

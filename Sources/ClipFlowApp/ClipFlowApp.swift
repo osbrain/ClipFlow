@@ -692,6 +692,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 }
             )
         )
+        SettingsWindowAppearance.installMaterial(in: window)
         let controller = NSWindowController(window: window)
         settingsWindow = controller
         controller.showWindow(nil)

@@ -9,11 +9,29 @@ public enum PanelDismissalPolicy {
 
 @MainActor
 public enum SettingsWindowAppearance {
+    static let materialIdentifier = NSUserInterfaceItemIdentifier(
+        "ClipFlow.settingsWindowMaterial"
+    )
+
     public static func apply(to window: NSWindow) {
         window.styleMask.remove(.fullSizeContentView)
-        window.backgroundColor = .windowBackgroundColor
-        window.isOpaque = true
-        window.titlebarAppearsTransparent = false
+        window.backgroundColor = .clear
+        window.isOpaque = false
+        window.titlebarAppearsTransparent = true
+    }
+
+    public static func installMaterial(in window: NSWindow) {
+        guard let themeFrame = window.contentView?.superview else { return }
+        guard themeFrame.subviews.contains(where: { $0.identifier == materialIdentifier }) == false
+        else { return }
+
+        let materialView = NSVisualEffectView(frame: themeFrame.bounds)
+        materialView.identifier = materialIdentifier
+        materialView.material = .underWindowBackground
+        materialView.blendingMode = .withinWindow
+        materialView.state = .active
+        materialView.autoresizingMask = [.width, .height]
+        themeFrame.addSubview(materialView, positioned: .below, relativeTo: window.contentView)
     }
 }
 
