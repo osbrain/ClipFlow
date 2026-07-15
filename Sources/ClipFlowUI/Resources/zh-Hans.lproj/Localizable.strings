@@ -148,6 +148,7 @@
 "settings.permission.granted" = "已授权";
 "settings.permission.notGranted" = "未授权";
 "settings.openSystemSettings" = "打开系统设置";
+"settings.refreshPermission" = "重新检测授权状态";
 "settings.browserTabs" = "浏览器标签页管理";
 "settings.feishuAction" = "发送到飞书";
 "settings.doubaoAction" = "询问豆包";

@@ -119,6 +119,7 @@ struct ClipboardKindPresentationTests {
             "settings.logPath",
             "settings.logNotCreated",
             "settings.revealLog",
+            "settings.refreshPermission",
             "header.pasteTarget",
             "header.clipboardTarget",
             "menu.status.records",

@@ -148,6 +148,7 @@
 "settings.permission.granted" = "Granted";
 "settings.permission.notGranted" = "Not Granted";
 "settings.openSystemSettings" = "Open Settings";
+"settings.refreshPermission" = "Refresh Permission Status";
 "settings.browserTabs" = "Browser Tab Management";
 "settings.feishuAction" = "Send to Feishu Action";
 "settings.doubaoAction" = "Ask Doubao Action";

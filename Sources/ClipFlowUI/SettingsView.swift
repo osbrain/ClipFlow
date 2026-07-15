@@ -63,6 +63,11 @@ public struct SettingsView: View {
         .task {
             await model.refreshPermissions()
             model.refreshDiagnostics()
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(1))
+                guard !Task.isCancelled else { return }
+                await model.refreshPermissions()
+            }
         }
     }
 
@@ -188,6 +193,15 @@ public struct SettingsView: View {
                     )
                     .font(.callout.weight(.medium))
                     .foregroundStyle(model.isAccessibilityTrusted ? .green : .secondary)
+
+                    Button {
+                        Task { await model.refreshPermissions() }
+                    } label: {
+                        Image(systemName: "arrow.clockwise")
+                    }
+                    .buttonStyle(.borderless)
+                    .accessibilityLabel(L10n.string("settings.refreshPermission"))
+                    .help(L10n.string("settings.refreshPermission"))
 
                     Button {
                         Task {
@@ -349,6 +363,7 @@ public struct SettingsView: View {
                 .labelsHidden()
                 .pickerStyle(.menu)
                 .controlSize(.small)
+                .frame(width: 168, alignment: .trailing)
                 .accessibilityLabel(title)
                 .help(title)
         }
