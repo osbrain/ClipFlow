@@ -68,6 +68,7 @@ struct WindowExperienceTests {
 
         SettingsWindowAppearance.apply(to: window)
 
+        #expect(SettingsWindowAppearance.contentSize == NSSize(width: 700, height: 700))
         #expect(window.contentMinSize == SettingsWindowAppearance.contentSize)
         #expect(window.contentMaxSize == SettingsWindowAppearance.contentSize)
         #expect(!window.styleMask.contains(.resizable))

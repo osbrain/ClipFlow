@@ -224,10 +224,10 @@ for candidate in candidates {
             && !candidate.title.localizedCaseInsensitiveContains("ClipFlow Settings")
     } else if selector == "__SETTINGS__" {
         titleMatches = candidate.layer == 0
-            && candidate.width >= 740
-            && candidate.width <= 780
-            && candidate.height >= 640
-            && candidate.height <= 700
+            && candidate.width >= 680
+            && candidate.width <= 720
+            && candidate.height >= 700
+            && candidate.height <= 760
     } else {
         titleMatches = selector.isEmpty
             || candidate.title.localizedCaseInsensitiveContains(selector)

@@ -9,7 +9,7 @@ public enum PanelDismissalPolicy {
 
 @MainActor
 public enum SettingsWindowAppearance {
-    public static let contentSize = NSSize(width: 760, height: 640)
+    public static let contentSize = NSSize(width: 700, height: 700)
 
     static let materialIdentifier = NSUserInterfaceItemIdentifier(
         "ClipFlow.settingsWindowMaterial"
