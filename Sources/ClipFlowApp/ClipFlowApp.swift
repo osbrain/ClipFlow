@@ -637,7 +637,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             return
         }
 
-        let window = NSWindow(
+        let window = SettingsWindow(
             contentRect: NSRect(origin: .zero, size: SettingsWindowAppearance.contentSize),
             styleMask: [.titled, .closable, .miniaturizable, .resizable],
             backing: .buffered,
@@ -702,7 +702,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 }
             )
         )
-        SettingsWindowAppearance.installMaterial(in: window)
         let controller = NSWindowController(window: window)
         settingsWindow = controller
         controller.showWindow(nil)
@@ -820,6 +819,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         return Date(timeIntervalSince1970: epochSeconds)
     }
     #endif
+}
+
+@MainActor
+private final class SettingsWindow: NSWindow {
+    override func performClose(_ sender: Any?) {
+        orderOut(sender)
+    }
+
+    override func miniaturize(_ sender: Any?) {
+        switch SettingsWindowMinimizeBehavior.action(
+            forAccessoryApplication: NSApp.activationPolicy() == .accessory
+        ) {
+        case .hide:
+            orderOut(sender)
+        case .miniaturize:
+            super.miniaturize(sender)
+        }
+    }
 }
 
 private struct SettingsWindowRootView: View {

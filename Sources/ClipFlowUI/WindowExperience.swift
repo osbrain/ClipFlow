@@ -11,10 +11,6 @@ public enum PanelDismissalPolicy {
 public enum SettingsWindowAppearance {
     public static let contentSize = NSSize(width: 700, height: 700)
 
-    static let materialIdentifier = NSUserInterfaceItemIdentifier(
-        "ClipFlow.settingsWindowMaterial"
-    )
-
     public static func apply(to window: NSWindow) {
         window.styleMask.formUnion([.titled, .closable, .miniaturizable])
         window.styleMask.remove(.resizable)
@@ -28,29 +24,20 @@ public enum SettingsWindowAppearance {
         window.standardWindowButton(.zoomButton)?.isHidden = true
         window.styleMask.remove(.fullSizeContentView)
         window.title = ""
-        window.backgroundColor = .clear
-        window.isOpaque = false
-        window.titlebarAppearsTransparent = true
-    }
-
-    public static func installMaterial(in window: NSWindow) {
-        guard let themeFrame = window.contentView?.superview else { return }
-        guard themeFrame.subviews.contains(where: { $0.identifier == materialIdentifier }) == false
-        else { return }
-
-        let materialView = SettingsWindowMaterialView(frame: themeFrame.bounds)
-        materialView.identifier = materialIdentifier
-        materialView.material = .underWindowBackground
-        materialView.blendingMode = .withinWindow
-        materialView.state = .active
-        materialView.autoresizingMask = [.width, .height]
-        themeFrame.addSubview(materialView, positioned: .below, relativeTo: window.contentView)
+        window.backgroundColor = .windowBackgroundColor
+        window.isOpaque = true
+        window.titlebarAppearsTransparent = false
     }
 }
 
-private final class SettingsWindowMaterialView: NSVisualEffectView {
-    override func hitTest(_ point: NSPoint) -> NSView? {
-        nil
+public enum SettingsWindowMinimizeBehavior {
+    public enum Action: Equatable {
+        case hide
+        case miniaturize
+    }
+
+    public static func action(forAccessoryApplication: Bool) -> Action {
+        forAccessoryApplication ? .hide : .miniaturize
     }
 }
 

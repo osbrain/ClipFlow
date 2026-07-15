@@ -38,7 +38,7 @@ struct WindowExperienceTests {
         )
     }
 
-    @Test("settings window keeps its title bar in the layout while using material")
+    @Test("settings window keeps native titlebar controls unobstructed")
     func settingsWindowAppearance() {
         let window = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: 640, height: 700),
@@ -52,9 +52,9 @@ struct WindowExperienceTests {
 
         #expect(!window.styleMask.contains(.fullSizeContentView))
         #expect(window.title.isEmpty)
-        #expect(window.titlebarAppearsTransparent)
-        #expect(!window.isOpaque)
-        #expect(window.backgroundColor == .clear)
+        #expect(!window.titlebarAppearsTransparent)
+        #expect(window.isOpaque)
+        #expect(window.backgroundColor == .windowBackgroundColor)
     }
 
     @Test("settings window keeps usable traffic lights at a fixed rectangular size")
@@ -79,27 +79,18 @@ struct WindowExperienceTests {
         #expect(window.standardWindowButton(.zoomButton)?.isHidden == true)
     }
 
-    @Test("settings window installs content material beneath its title bar")
-    func settingsWindowMaterial() {
-        let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 640, height: 700),
-            styleMask: [.titled, .closable, .resizable],
-            backing: .buffered,
-            defer: false
+    @Test("accessory settings windows hide when the minimize control is used")
+    func accessoryWindowMinimizeBehavior() {
+        #expect(
+            SettingsWindowMinimizeBehavior.action(
+                forAccessoryApplication: true
+            ) == .hide
         )
-        window.contentView = NSView()
-
-        SettingsWindowAppearance.installMaterial(in: window)
-
-        let materialView = window.contentView?.superview?.subviews
-            .compactMap { $0 as? NSVisualEffectView }
-            .first { $0.identifier == SettingsWindowAppearance.materialIdentifier }
-        #expect(materialView?.material == .underWindowBackground)
-        #expect(materialView?.blendingMode == .withinWindow)
-        #expect(materialView?.state == .active)
-        #expect(materialView?.autoresizingMask.contains(.width) == true)
-        #expect(materialView?.autoresizingMask.contains(.height) == true)
-        #expect(materialView?.hitTest(NSPoint(x: 8, y: 8)) == nil)
+        #expect(
+            SettingsWindowMinimizeBehavior.action(
+                forAccessoryApplication: false
+            ) == .miniaturize
+        )
     }
 
     @Test("overlay scroll indicators stay four points thick in both orientations")
