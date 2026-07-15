@@ -12,9 +12,16 @@ public struct OnboardingView: View {
 
     public var body: some View {
         VStack(spacing: 24) {
-            Image(systemName: "doc.on.clipboard.fill")
-                .font(.system(size: 52, weight: .medium))
-                .foregroundStyle(.blue)
+            if let icon = ClipFlowBrandIcon.image() {
+                Image(nsImage: icon)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 84, height: 84)
+            } else {
+                Image(systemName: "doc.on.clipboard.fill")
+                    .font(.system(size: 52, weight: .medium))
+                    .foregroundStyle(.blue)
+            }
             VStack(spacing: 8) {
                 Text(L10n.string("app.name"))
                     .font(.largeTitle.weight(.semibold))

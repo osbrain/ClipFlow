@@ -36,6 +36,16 @@ struct ApplicationIconProviderTests {
         #expect(ApplicationIconProvider.fallbackSymbolName == "app.dashed")
     }
 
+    @MainActor
+    @Test("brand icon is bundled at macOS app-icon resolution")
+    func bundledBrandIcon() {
+        let icon = ClipFlowBrandIcon.image()
+
+        #expect(icon != nil)
+        #expect(icon?.representations.map(\.pixelsWide).max() == 1_024)
+        #expect(icon?.representations.map(\.pixelsHigh).max() == 1_024)
+    }
+
     @Test("replacing a thumbnail preserves descriptor metadata")
     func replacingThumbnail() {
         let itemID = UUID()

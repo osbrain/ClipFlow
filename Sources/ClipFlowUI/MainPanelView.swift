@@ -395,18 +395,8 @@ private struct ClipFlowHeader: View {
 
     var body: some View {
         HStack(spacing: 13) {
-            ZStack {
-                RoundedRectangle(cornerRadius: 11)
-                    .fill(.thinMaterial)
-                RoundedRectangle(cornerRadius: 11)
-                    .stroke(Color.accentColor.opacity(0.45))
-                Image(systemName: "doc.on.clipboard.fill")
-                    .font(.system(size: 21, weight: .semibold))
-                    .symbolRenderingMode(.hierarchical)
-                    .foregroundStyle(.tint)
-                    .accessibilityHidden(true)
-            }
-            .frame(width: 42, height: 42)
+            brandIcon
+                .frame(width: 42, height: 42)
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(L10n.string("app.name"))
@@ -449,6 +439,28 @@ private struct ClipFlowHeader: View {
         .padding(.horizontal, 14)
         .frame(height: 68)
         .background(.ultraThinMaterial)
+    }
+
+    @ViewBuilder
+    private var brandIcon: some View {
+        if let icon = ClipFlowBrandIcon.image() {
+            Image(nsImage: icon)
+                .resizable()
+                .scaledToFit()
+                .accessibilityHidden(true)
+        } else {
+            ZStack {
+                RoundedRectangle(cornerRadius: 11)
+                    .fill(.thinMaterial)
+                RoundedRectangle(cornerRadius: 11)
+                    .stroke(Color.accentColor.opacity(0.45))
+                Image(systemName: "doc.on.clipboard.fill")
+                    .font(.system(size: 21, weight: .semibold))
+                    .symbolRenderingMode(.hierarchical)
+                    .foregroundStyle(.tint)
+                    .accessibilityHidden(true)
+            }
+        }
     }
 
     private func browserApplicationIcon(for browser: BrowserKind) -> NSImage? {

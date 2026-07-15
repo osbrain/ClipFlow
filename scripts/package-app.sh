@@ -47,6 +47,9 @@ trap '/bin/rm -rf "$STAGING_ROOT"' EXIT
     "$SOURCE_RESOURCE_BUNDLE" \
     "$STAGING_APP/Contents/Resources/ClipFlow_ClipFlowUI.bundle"
 /usr/bin/ditto \
+    "$REPO_ROOT/Sources/ClipFlowUI/Resources/AppIcon.icns" \
+    "$STAGING_APP/Contents/Resources/AppIcon.icns"
+/usr/bin/ditto \
     "$REPO_ROOT/Config/zh-Hans.lproj/InfoPlist.strings" \
     "$STAGING_APP/Contents/Resources/zh-Hans.lproj/InfoPlist.strings"
 /usr/bin/printf 'APPL????' > "$STAGING_APP/Contents/PkgInfo"

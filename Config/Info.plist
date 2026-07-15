@@ -6,6 +6,8 @@
     <string>en</string>
     <key>CFBundleDisplayName</key>
     <string>ClipFlow</string>
+    <key>CFBundleIconFile</key>
+    <string>AppIcon.icns</string>
     <key>CFBundleExecutable</key>
     <string>ClipFlowApp</string>
     <key>CFBundleIdentifier</key>
