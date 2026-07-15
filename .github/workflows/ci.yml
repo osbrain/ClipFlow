@@ -1,0 +1,31 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-test:
+    name: Build, test, and package
+    runs-on: macos-latest
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Bootstrap local dependencies
+        run: ./scripts/bootstrap-dev-deps.sh
+
+      - name: Run core tests
+        run: swift run ClipFlowCoreTests
+
+      - name: Package release app
+        run: ./scripts/package-app.sh release
+
+      - name: Verify app bundle
+        run: ./scripts/verify-local-app.sh artifacts/ClipFlow.app

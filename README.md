@@ -6,10 +6,10 @@ ClipFlow is a native, privacy-first clipboard manager for macOS. It keeps your c
 
 ## Highlights
 
-- Capture and restore text, rich text, links, files, images, PDFs, colors, and supported pasteboard data.
+- Capture and restore text, rich text, links, files, images, PDFs, and other supported pasteboard representations.
 - Search clipboard history and browse it by content type, favorites, and custom categories.
-- Open a floating clipboard panel with `Command` + `Shift` + `V`, then paste, copy, favorite, rename, categorize, preview, or delete an item.
-- Choose original-format or plain-text paste behavior, including per-application preferences.
+- Open a floating clipboard panel with `Command` + `Shift` + `V`, then paste, favorite, rename, categorize, preview, or delete an item.
+- Choose original-format or plain-text paste behavior.
 - Optionally browse and activate tabs from Safari, Google Chrome, and Microsoft Edge.
 - Encrypt clipboard metadata with SQLCipher and encrypt large local payload files separately.
 - Run entirely on your Mac: no accounts, advertising, analytics, telemetry, or cloud clipboard processing.
@@ -31,7 +31,7 @@ Clipboard data is stored locally. ClipFlow requests optional macOS permissions o
 ## Build from Source
 
 ```bash
-git clone https://github.com/<your-account>/ClipFlow.git
+git clone git@github.com:osbrain/ClipFlow.git
 cd ClipFlow
 
 ./scripts/bootstrap-dev-deps.sh

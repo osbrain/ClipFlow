@@ -8,3 +8,9 @@ xcuserdata/
 .superpowers/
 .worktrees/
 artifacts/
+.env
+.env.*
+!.env.example
+*.xcarchive
+*.dSYM
+*.app
