@@ -5,6 +5,24 @@ import Testing
 
 @Suite("Status menu presentation")
 struct StatusMenuPresentationTests {
+    @MainActor
+    @Test("defers panel presentation until status menu tracking has ended")
+    func defersPanelPresentation() async {
+        var presentationCount = 0
+
+        StatusMenuPanelPresentation.afterMenuCloses {
+            presentationCount += 1
+        }
+
+        #expect(presentationCount == 0)
+        await withCheckedContinuation { continuation in
+            DispatchQueue.main.async {
+                continuation.resume()
+            }
+        }
+        #expect(presentationCount == 1)
+    }
+
     @Test("shows three recent items with source and kind metadata")
     func recentItemsAreCompactAndOrdered() {
         let newest = Self.item(

@@ -602,7 +602,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     @objc private func showPanelFromMenu() {
-        if panelController?.window?.isVisible != true {
+        StatusMenuPanelPresentation.afterMenuCloses { [weak self] in
+            guard let self else { return }
             capturePasteTarget()
             panelController?.show()
         }

@@ -39,3 +39,12 @@ public struct StatusMenuPresentation: Equatable, Sendable {
         self.pasteDestinationName = pasteDestinationName
     }
 }
+
+@MainActor
+public enum StatusMenuPanelPresentation {
+    public static func afterMenuCloses(_ action: @escaping @MainActor () -> Void) {
+        DispatchQueue.main.async { @MainActor in
+            action()
+        }
+    }
+}
