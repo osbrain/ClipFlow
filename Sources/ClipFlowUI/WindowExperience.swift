@@ -2,8 +2,11 @@ import AppKit
 import SwiftUI
 
 public enum PanelDismissalPolicy {
-    public static func shouldHideOnResign(isPresentingSheet: Bool) -> Bool {
-        !isPresentingSheet
+    public static func shouldHideOnResign(
+        isPresentingSheet: Bool,
+        isPresentingOnboarding: Bool = false
+    ) -> Bool {
+        !isPresentingSheet && !isPresentingOnboarding
     }
 }
 

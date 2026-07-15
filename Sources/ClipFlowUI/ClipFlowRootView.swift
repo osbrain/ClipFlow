@@ -47,7 +47,7 @@ public struct ClipFlowRootView: View {
                 showSettings: showSettings
             )
         } else {
-            OnboardingView(settings: settings) {
+            OnboardingView(settings: settings, inputState: inputState) {
                 hasCompletedOnboarding = true
             }
         }

@@ -9,6 +9,12 @@ struct WindowExperienceTests {
     func panelDismissalPolicy() {
         #expect(PanelDismissalPolicy.shouldHideOnResign(isPresentingSheet: false))
         #expect(!PanelDismissalPolicy.shouldHideOnResign(isPresentingSheet: true))
+        #expect(
+            !PanelDismissalPolicy.shouldHideOnResign(
+                isPresentingSheet: false,
+                isPresentingOnboarding: true
+            )
+        )
     }
 
     @Test("window and scroll appearance use compact product metrics")

@@ -3,10 +3,16 @@ import SwiftUI
 
 public struct OnboardingView: View {
     @Bindable private var settings: SettingsModel
+    private let inputState: PanelInputStateStore
     private let complete: () -> Void
 
-    public init(settings: SettingsModel, complete: @escaping () -> Void) {
+    public init(
+        settings: SettingsModel,
+        inputState: PanelInputStateStore,
+        complete: @escaping () -> Void
+    ) {
         self.settings = settings
+        self.inputState = inputState
         self.complete = complete
     }
 
@@ -71,6 +77,8 @@ public struct OnboardingView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(.regularMaterial)
         .task { await settings.refreshPermissions() }
+        .onAppear { inputState.isPresentingOnboarding = true }
+        .onDisappear { inputState.isPresentingOnboarding = false }
     }
 
     private static func openAccessibilitySettings() {

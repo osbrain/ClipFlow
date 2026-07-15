@@ -29,6 +29,7 @@ public final class PanelInputStateStore {
     public var focus: PanelCommandFocus = .search
     public var searchText = ""
     public var isPresentingSheet = false
+    public var isPresentingOnboarding = false
     public var isPanelVisible = false
     public private(set) var requestedListFocus: PanelListFocusRequest?
 

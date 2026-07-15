@@ -95,7 +95,8 @@ final class FloatingPanelController: NSWindowController, NSWindowDelegate {
 
     func windowDidResignKey(_ notification: Notification) {
         guard PanelDismissalPolicy.shouldHideOnResign(
-            isPresentingSheet: inputState.isPresentingSheet
+            isPresentingSheet: inputState.isPresentingSheet,
+            isPresentingOnboarding: inputState.isPresentingOnboarding
         ) else { return }
         hide()
     }
