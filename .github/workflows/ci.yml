@@ -29,3 +29,6 @@ jobs:
 
       - name: Verify app bundle
         run: ./scripts/verify-local-app.sh artifacts/ClipFlow.app
+
+      - name: Package and verify DMG
+        run: ./Tests/package-dmg-test.sh
