@@ -501,7 +501,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 let item = NSMenuItem(
                     title: L10n.format(
                         "menu.status.recentItem",
-                        recentItem.title,
+                        recentItem.menuTitle,
                         recentItem.sourceName,
                         recentItem.kind.localizedDisplayName
                     ),

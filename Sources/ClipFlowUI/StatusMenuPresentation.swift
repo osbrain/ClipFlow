@@ -1,7 +1,10 @@
+import AppKit
 import ClipFlowCore
 import Foundation
 
 public struct StatusMenuRecentItem: Equatable, Sendable, Identifiable {
+    public static let maximumMenuTitleWidth: CGFloat = 220
+
     public let id: UUID
     public let title: String
     public let sourceName: String
@@ -9,6 +12,14 @@ public struct StatusMenuRecentItem: Equatable, Sendable, Identifiable {
 
     public var symbolName: String {
         kind.presentation.symbolName
+    }
+
+    public var menuTitle: String {
+        Self.truncatedMenuTitle(title)
+    }
+
+    public var menuTitleWidth: CGFloat {
+        Self.renderedWidth(of: menuTitle)
     }
 
     init(item: ClipboardItem) {
@@ -20,6 +31,34 @@ public struct StatusMenuRecentItem: Equatable, Sendable, Identifiable {
             .split(whereSeparator: \ .isWhitespace)
             .joined(separator: " ")
         title = compactTitle.isEmpty ? item.appName : compactTitle
+    }
+
+    private static func truncatedMenuTitle(_ title: String) -> String {
+        guard renderedWidth(of: title) > maximumMenuTitleWidth else {
+            return title
+        }
+
+        let characters = Array(title)
+        var lowerBound = 0
+        var upperBound = characters.count
+
+        while lowerBound < upperBound {
+            let midpoint = (lowerBound + upperBound + 1) / 2
+            let candidate = String(characters.prefix(midpoint)) + "…"
+            if renderedWidth(of: candidate) <= maximumMenuTitleWidth {
+                lowerBound = midpoint
+            } else {
+                upperBound = midpoint - 1
+            }
+        }
+
+        return String(characters.prefix(lowerBound)) + "…"
+    }
+
+    private static func renderedWidth(of title: String) -> CGFloat {
+        (title as NSString).size(withAttributes: [
+            .font: NSFont.menuFont(ofSize: 0)
+        ]).width
     }
 }
 

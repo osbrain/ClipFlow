@@ -72,6 +72,24 @@ struct StatusMenuPresentationTests {
         #expect(presentation.recentItems[0].title == "Finder")
     }
 
+    @Test("truncates long recent titles to the menu title width")
+    func longRecentTitlesUseATrailingEllipsis() {
+        let item = Self.item(
+            preview: String(repeating: "A long clipboard title that should not widen the status menu ", count: 8),
+            appName: "Notes",
+            kind: .text
+        )
+
+        let presentation = StatusMenuPresentation(
+            items: [item],
+            pasteDestinationName: nil
+        )
+        let recentItem = try! #require(presentation.recentItems.first)
+
+        #expect(recentItem.menuTitle.hasSuffix("…"))
+        #expect(recentItem.menuTitleWidth <= StatusMenuRecentItem.maximumMenuTitleWidth)
+    }
+
     private static func item(
         preview: String,
         appName: String,
