@@ -44,6 +44,10 @@ struct ApplicationIconProviderTests {
         #expect(icon != nil)
         #expect(icon?.representations.map(\.pixelsWide).max() == 1_024)
         #expect(icon?.representations.map(\.pixelsHigh).max() == 1_024)
+        let largestRepresentation = icon?.representations
+            .compactMap { $0 as? NSBitmapImageRep }
+            .max { $0.pixelsWide < $1.pixelsWide }
+        #expect(largestRepresentation?.colorAt(x: 0, y: 0)?.alphaComponent == 0)
     }
 
     @Test("replacing a thumbnail preserves descriptor metadata")
