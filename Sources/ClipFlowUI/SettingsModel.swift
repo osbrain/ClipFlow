@@ -21,6 +21,7 @@ extension UserDefaults: SettingsStoring {
 public protocol PermissionStatusProviding: Sendable {
     func isAccessibilityTrusted() -> Bool
     func requestAccessibilityAuthorization() -> Bool
+    func resetAccessibilityAuthorization()
 }
 
 public struct SystemPermissionStatus: PermissionStatusProviding {
@@ -32,6 +33,17 @@ public struct SystemPermissionStatus: PermissionStatusProviding {
         return AXIsProcessTrustedWithOptions(
             [promptKey: true] as CFDictionary
         )
+    }
+
+    public func resetAccessibilityAuthorization() {
+        guard let bundleIdentifier = Bundle.main.bundleIdentifier, !bundleIdentifier.isEmpty else {
+            return
+        }
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/tccutil")
+        process.arguments = ["reset", "Accessibility", bundleIdentifier]
+        try? process.run()
+        process.waitUntilExit()
     }
 }
 
@@ -160,6 +172,11 @@ public final class SettingsModel {
 
     public func requestAccessibilityAuthorization() async {
         _ = permissions.requestAccessibilityAuthorization()
+        isAccessibilityTrusted = permissions.isAccessibilityTrusted()
+    }
+
+    public func resetAccessibilityAuthorization() async {
+        permissions.resetAccessibilityAuthorization()
         isAccessibilityTrusted = permissions.isAccessibilityTrusted()
     }
 

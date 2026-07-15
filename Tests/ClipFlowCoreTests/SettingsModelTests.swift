@@ -7,6 +7,11 @@ import ClipFlowSystem
 @Suite("Settings model")
 @MainActor
 struct SettingsModelTests {
+    @Test("settings menu controls use a compact fixed width")
+    func settingsMenuControlsUseCompactFixedWidth() {
+        #expect(SettingsControlLayout.menuWidth == 168)
+    }
+
     @Test("retention preferences have stable stored values")
     func retentionPreferencesHaveStableStoredValues() {
         #expect(RetentionPreference.day.rawValue == "day")
@@ -163,6 +168,20 @@ struct SettingsModelTests {
         #expect(model.isAccessibilityTrusted)
     }
 
+    @Test("resetting Accessibility removes a stale grant before requesting the current app")
+    func resetsStaleAccessibilityAuthorization() async {
+        let permissions = FakePermissionStatus(accessibilityTrusted: true)
+        let model = SettingsModel(
+            store: MemorySettingsStore(),
+            permissions: permissions
+        )
+
+        await model.resetAccessibilityAuthorization()
+
+        #expect(permissions.resetCount == 1)
+        #expect(!model.isAccessibilityTrusted)
+    }
+
     @Test("persists appearance and density preferences")
     func persistsAppearanceAndDensityPreferences() {
         let store = MemorySettingsStore()
@@ -304,6 +323,7 @@ private final class FakePermissionStatus: PermissionStatusProviding, @unchecked 
     private var trusted: Bool
     private let grantsOnRequest: Bool
     private var requests = 0
+    private var resets = 0
 
     init(accessibilityTrusted: Bool, grantsOnRequest: Bool = false) {
         trusted = accessibilityTrusted
@@ -323,6 +343,10 @@ private final class FakePermissionStatus: PermissionStatusProviding, @unchecked 
         lock.withLock { requests }
     }
 
+    var resetCount: Int {
+        lock.withLock { resets }
+    }
+
     func requestAccessibilityAuthorization() -> Bool {
         lock.withLock {
             requests += 1
@@ -330,6 +354,13 @@ private final class FakePermissionStatus: PermissionStatusProviding, @unchecked 
                 trusted = true
             }
             return trusted
+        }
+    }
+
+    func resetAccessibilityAuthorization() {
+        lock.withLock {
+            resets += 1
+            trusted = false
         }
     }
 }

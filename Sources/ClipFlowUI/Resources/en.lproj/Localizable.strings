@@ -149,6 +149,8 @@
 "settings.permission.notGranted" = "Not Granted";
 "settings.openSystemSettings" = "Open Settings";
 "settings.refreshPermission" = "Refresh Permission Status";
+"settings.resetAccessibility" = "Rebind Current App";
+"settings.resetAccessibilityHelp" = "Remove an outdated Accessibility entry, then request permission for this installed copy.";
 "settings.browserTabs" = "Browser Tab Management";
 "settings.feishuAction" = "Send to Feishu Action";
 "settings.doubaoAction" = "Ask Doubao Action";

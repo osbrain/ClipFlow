@@ -3,6 +3,11 @@ import ClipFlowCore
 import ClipFlowSystem
 import SwiftUI
 
+public enum SettingsControlLayout {
+    public static let menuWidth: CGFloat = 168
+    static let menuHeight: CGFloat = 28
+}
+
 public struct SettingsView: View {
     @Bindable private var model: SettingsModel
     private let loginItemService: LoginItemService
@@ -77,7 +82,8 @@ public struct SettingsView: View {
                 menuRow(
                     icon: "command",
                     title: L10n.string("settings.shortcut"),
-                    selection: $model.shortcut
+                    selection: $model.shortcut,
+                    valueLabel: L10n.string(model.shortcut.localizationKey)
                 ) {
                     ForEach(HotKeyShortcut.allCases, id: \.self) { shortcut in
                         Text(L10n.string(shortcut.localizationKey)).tag(shortcut)
@@ -93,7 +99,8 @@ public struct SettingsView: View {
                 menuRow(
                     icon: "circle.lefthalf.filled",
                     title: L10n.string("settings.appearance"),
-                    selection: $model.appearanceMode
+                    selection: $model.appearanceMode,
+                    valueLabel: L10n.string(model.appearanceMode.localizationKey)
                 ) {
                     ForEach(ClipFlowAppearanceMode.allCases, id: \.self) { appearance in
                         Text(L10n.string(appearance.localizationKey)).tag(appearance)
@@ -103,7 +110,8 @@ public struct SettingsView: View {
                 menuRow(
                     icon: "globe",
                     title: L10n.string("settings.language"),
-                    selection: languageBinding
+                    selection: languageBinding,
+                    valueLabel: L10n.string(model.appLanguage.localizationKey)
                 ) {
                     ForEach(AppLanguage.allCases, id: \.self) { language in
                         Text(L10n.string(language.localizationKey)).tag(language)
@@ -113,7 +121,8 @@ public struct SettingsView: View {
                 menuRow(
                     icon: "rectangle.compress.vertical",
                     title: L10n.string("settings.density"),
-                    selection: $model.listDensity
+                    selection: $model.listDensity,
+                    valueLabel: L10n.string(model.listDensity.localizationKey)
                 ) {
                     ForEach(ClipFlowListDensity.allCases, id: \.self) { density in
                         Text(L10n.string(density.localizationKey)).tag(density)
@@ -123,7 +132,8 @@ public struct SettingsView: View {
                 menuRow(
                     icon: "doc.on.clipboard",
                     title: L10n.string("settings.defaultPasteMode"),
-                    selection: $model.defaultPasteMode
+                    selection: $model.defaultPasteMode,
+                    valueLabel: L10n.string("settings.paste.\(model.defaultPasteMode)")
                 ) {
                     Text(L10n.string("settings.paste.original")).tag("original")
                     Text(L10n.string("settings.paste.plainText")).tag("plainText")
@@ -216,6 +226,24 @@ public struct SettingsView: View {
                     .buttonStyle(.bordered)
                     .controlSize(.small)
                     .help(L10n.string("settings.openSystemSettings"))
+
+                    if !model.isAccessibilityTrusted {
+                        Button {
+                            Task {
+                                await model.resetAccessibilityAuthorization()
+                                await model.requestAccessibilityAuthorization()
+                                Self.openAccessibilitySettings()
+                            }
+                        } label: {
+                            Label(
+                                L10n.string("settings.resetAccessibility"),
+                                systemImage: "arrow.triangle.2.circlepath"
+                            )
+                        }
+                        .buttonStyle(.bordered)
+                        .controlSize(.small)
+                        .help(L10n.string("settings.resetAccessibilityHelp"))
+                    }
                 }
 
                 toggleRow(
@@ -356,14 +384,35 @@ public struct SettingsView: View {
         icon: String,
         title: String,
         selection: Binding<Value>,
+        valueLabel: String,
         @ViewBuilder content: () -> Content
     ) -> some View {
         GlassRow(icon: icon, title: title) {
-            Picker(title, selection: selection, content: content)
-                .labelsHidden()
-                .pickerStyle(.menu)
-                .controlSize(.small)
-                .frame(width: 168, alignment: .trailing)
+            Menu {
+                Picker(title, selection: selection, content: content)
+            } label: {
+                HStack(spacing: 8) {
+                    Text(valueLabel)
+                        .lineLimit(1)
+                        .truncationMode(.tail)
+                    Spacer(minLength: 0)
+                    Image(systemName: "chevron.up.chevron.down")
+                        .font(.caption2.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                }
+                .padding(.horizontal, 9)
+                .frame(
+                    width: SettingsControlLayout.menuWidth,
+                    height: SettingsControlLayout.menuHeight
+                )
+                .background(.primary.opacity(0.055), in: RoundedRectangle(cornerRadius: 7))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 7)
+                        .stroke(.primary.opacity(0.10), lineWidth: 1)
+                }
+            }
+            .menuStyle(.borderlessButton)
+            .fixedSize(horizontal: true, vertical: false)
                 .accessibilityLabel(title)
                 .help(title)
         }
