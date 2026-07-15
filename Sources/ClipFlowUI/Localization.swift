@@ -162,12 +162,7 @@ public enum L10n {
     }
 
     private static var resourceBundle: Bundle {
-        if let resourceURL = Bundle.main.resourceURL?
-            .appendingPathComponent("ClipFlow_ClipFlowUI.bundle", isDirectory: true),
-           let packagedBundle = Bundle(url: resourceURL) {
-            return packagedBundle
-        }
-        return Bundle.module
+        ClipFlowResourceBundle.bundle
     }
 
     private static func effectiveLocaleIdentifier(

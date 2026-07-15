@@ -50,6 +50,23 @@ struct ApplicationIconProviderTests {
         #expect(largestRepresentation?.colorAt(x: 0, y: 0)?.alphaComponent == 0)
     }
 
+    @Test("packaged UI resources resolve from the app Resources directory")
+    func packagedResourceLocation() {
+        let resourcesURL = URL(
+            fileURLWithPath: "/Applications/ClipFlow.app/Contents/Resources",
+            isDirectory: true
+        )
+
+        #expect(
+            ClipFlowResourceBundle.packagedBundleURL(
+                mainResourceURL: resourcesURL
+            ) == resourcesURL.appendingPathComponent(
+                "ClipFlow_ClipFlowUI.bundle",
+                isDirectory: true
+            )
+        )
+    }
+
     @Test("replacing a thumbnail preserves descriptor metadata")
     func replacingThumbnail() {
         let itemID = UUID()

@@ -2,7 +2,7 @@ import AppKit
 
 @MainActor
 public enum ClipFlowBrandIcon {
-    private static let bundledIcon = Bundle.module.url(
+    private static let bundledIcon = ClipFlowResourceBundle.bundle.url(
         forResource: "AppIcon",
         withExtension: "icns"
     ).flatMap(NSImage.init(contentsOf:))
