@@ -14,6 +14,16 @@
 - 使用 SQLCipher 加密剪贴板元数据，并单独加密较大的本地负载文件。
 - 完全在你的 Mac 本机运行：没有账户、广告、分析、遥测或云端剪贴板处理。
 
+## 界面预览
+
+| 剪贴板历史 | 类型专属操作 |
+| --- | --- |
+| ![拾笺深色简体中文主控面板](docs/images/main-panel-dark-zh.png) | ![拾笺图片条目的专属粘贴与预览操作](docs/images/image-actions-light-en.png) |
+
+| 设置 | 浏览器标签页 |
+| --- | --- |
+| ![拾笺的快捷键、外观、语言、保留策略和存储设置](docs/images/settings-light-en.png) | ![拾笺的浏览器标签页空状态与受支持浏览器状态](docs/images/browser-tabs-light-en.png) |
+
 ## 隐私与权限
 
 剪贴板数据仅存储在本机。ClipFlow 仅在相关功能启用时请求可选的 macOS 权限：

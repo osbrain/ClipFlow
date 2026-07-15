@@ -14,6 +14,16 @@ ClipFlow is a native, privacy-first clipboard manager for macOS. It keeps your c
 - Encrypt clipboard metadata with SQLCipher and encrypt large local payload files separately.
 - Run entirely on your Mac: no accounts, advertising, analytics, telemetry, or cloud clipboard processing.
 
+## Screenshots
+
+| Clipboard history | Type-specific actions |
+| --- | --- |
+| ![ClipFlow main clipboard panel in dark Simplified Chinese](docs/images/main-panel-dark-zh.png) | ![ClipFlow image entry with its dedicated paste and preview actions](docs/images/image-actions-light-en.png) |
+
+| Settings | Browser tabs |
+| --- | --- |
+| ![ClipFlow settings for shortcuts, appearance, language, retention, and storage](docs/images/settings-light-en.png) | ![ClipFlow browser tabs empty state and supported browser status](docs/images/browser-tabs-light-en.png) |
+
 ## Privacy and Permissions
 
 Clipboard data is stored locally. ClipFlow requests optional macOS permissions only when a related feature needs them:
