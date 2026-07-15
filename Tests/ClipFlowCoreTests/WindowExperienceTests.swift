@@ -57,6 +57,27 @@ struct WindowExperienceTests {
         #expect(window.backgroundColor == .clear)
     }
 
+    @Test("settings window keeps usable traffic lights at a fixed rectangular size")
+    func settingsWindowControlsAndSize() {
+        let window = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 640, height: 700),
+            styleMask: [.titled, .closable, .miniaturizable, .resizable],
+            backing: .buffered,
+            defer: false
+        )
+
+        SettingsWindowAppearance.apply(to: window)
+
+        #expect(window.contentMinSize == SettingsWindowAppearance.contentSize)
+        #expect(window.contentMaxSize == SettingsWindowAppearance.contentSize)
+        #expect(!window.styleMask.contains(.resizable))
+        #expect(window.standardWindowButton(.closeButton)?.isEnabled == true)
+        #expect(window.standardWindowButton(.closeButton)?.isHidden == false)
+        #expect(window.standardWindowButton(.miniaturizeButton)?.isEnabled == true)
+        #expect(window.standardWindowButton(.miniaturizeButton)?.isHidden == false)
+        #expect(window.standardWindowButton(.zoomButton)?.isHidden == true)
+    }
+
     @Test("settings window installs content material beneath its title bar")
     func settingsWindowMaterial() {
         let window = NSWindow(
@@ -77,6 +98,7 @@ struct WindowExperienceTests {
         #expect(materialView?.state == .active)
         #expect(materialView?.autoresizingMask.contains(.width) == true)
         #expect(materialView?.autoresizingMask.contains(.height) == true)
+        #expect(materialView?.hitTest(NSPoint(x: 8, y: 8)) == nil)
     }
 
     @Test("overlay scroll indicators stay four points thick in both orientations")

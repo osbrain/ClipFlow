@@ -9,11 +9,23 @@ public enum PanelDismissalPolicy {
 
 @MainActor
 public enum SettingsWindowAppearance {
+    public static let contentSize = NSSize(width: 760, height: 640)
+
     static let materialIdentifier = NSUserInterfaceItemIdentifier(
         "ClipFlow.settingsWindowMaterial"
     )
 
     public static func apply(to window: NSWindow) {
+        window.styleMask.formUnion([.titled, .closable, .miniaturizable])
+        window.styleMask.remove(.resizable)
+        window.setContentSize(contentSize)
+        window.contentMinSize = contentSize
+        window.contentMaxSize = contentSize
+        window.standardWindowButton(.closeButton)?.isEnabled = true
+        window.standardWindowButton(.closeButton)?.isHidden = false
+        window.standardWindowButton(.miniaturizeButton)?.isEnabled = true
+        window.standardWindowButton(.miniaturizeButton)?.isHidden = false
+        window.standardWindowButton(.zoomButton)?.isHidden = true
         window.styleMask.remove(.fullSizeContentView)
         window.title = ""
         window.backgroundColor = .clear
@@ -26,13 +38,19 @@ public enum SettingsWindowAppearance {
         guard themeFrame.subviews.contains(where: { $0.identifier == materialIdentifier }) == false
         else { return }
 
-        let materialView = NSVisualEffectView(frame: themeFrame.bounds)
+        let materialView = SettingsWindowMaterialView(frame: themeFrame.bounds)
         materialView.identifier = materialIdentifier
         materialView.material = .underWindowBackground
         materialView.blendingMode = .withinWindow
         materialView.state = .active
         materialView.autoresizingMask = [.width, .height]
         themeFrame.addSubview(materialView, positioned: .below, relativeTo: window.contentView)
+    }
+}
+
+private final class SettingsWindowMaterialView: NSVisualEffectView {
+    override func hitTest(_ point: NSPoint) -> NSView? {
+        nil
     }
 }
 

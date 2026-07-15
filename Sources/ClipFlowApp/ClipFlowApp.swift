@@ -638,12 +638,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
 
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 640, height: 700),
+            contentRect: NSRect(origin: .zero, size: SettingsWindowAppearance.contentSize),
             styleMask: [.titled, .closable, .miniaturizable, .resizable],
             backing: .buffered,
             defer: false
         )
-        window.minSize = NSSize(width: 560, height: 520)
         window.isReleasedWhenClosed = false
         SettingsWindowAppearance.apply(to: window)
         window.center()
