@@ -61,6 +61,7 @@
 "filter.files" = "文件";
 "filter.links" = "链接";
 "filter.browserTabs" = "浏览器标签页";
+"filter.more" = "更多";
 "kind.text" = "文本";
 "kind.richText" = "富文本";
 "kind.image" = "图片";
@@ -69,6 +70,7 @@
 "kind.mixed" = "混合内容";
 "kind.unknown" = "未知类型";
 "detail.preview" = "预览";
+"detail.fullPreview" = "完整预览";
 "detail.paste" = "粘贴";
 "detail.source" = "来源";
 "detail.kind" = "类型";

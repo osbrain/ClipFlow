@@ -58,7 +58,12 @@ public struct MainPanelView: View {
                     })
             }
         }
-        .frame(minWidth: 800, minHeight: 520)
+        .frame(
+            minWidth: MainPanelLayout.minimumWidth,
+            idealWidth: MainPanelLayout.idealWidth,
+            maxWidth: MainPanelLayout.maximumWidth,
+            minHeight: MainPanelLayout.minimumHeight
+        )
         .background(.regularMaterial)
         .clipShape(
             RoundedRectangle(
@@ -565,42 +570,153 @@ private struct HistoryFilterStrip: View {
     let deleteCategory: (UUID) -> Void
 
     var body: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 7) {
-                chip(.all, title: L10n.string("filter.all"), icon: "tray.full")
-                chip(.favorites, title: L10n.string("filter.favorites"), icon: "star")
-                chip(.kind(.text), title: L10n.string("filter.text"), icon: ClipboardKind.text.presentation.symbolName)
-                chip(.kind(.richText), title: L10n.string("filter.richText"), icon: ClipboardKind.richText.presentation.symbolName)
-                chip(.kind(.image), title: L10n.string("filter.images"), icon: ClipboardKind.image.presentation.symbolName)
-                chip(.kind(.file), title: L10n.string("filter.files"), icon: ClipboardKind.file.presentation.symbolName)
-                chip(.kind(.link), title: L10n.string("filter.links"), icon: ClipboardKind.link.presentation.symbolName)
-                if includesBrowserTabs {
-                    chip(.browserTabs, title: L10n.string("filter.browserTabs"), icon: "macwindow.on.rectangle")
-                }
-                ForEach(categories) { category in
-                    FilterChip(
-                        title: category.name,
-                        icon: "folder",
-                        isSelected: selectedFilter == .category(category.id)
-                    ) {
-                        selectFilter(.category(category.id))
-                    }
-                    .contextMenu {
-                        Button(L10n.string("category.delete"), role: .destructive) {
-                            deleteCategory(category.id)
-                        }
-                    }
-                }
-                Button(action: createCategory) {
-                    Image(systemName: "plus")
-                        .frame(width: 24, height: 24)
-                }
-                .buttonStyle(.bordered)
-                .accessibilityLabel(L10n.string("category.new"))
-                .help(L10n.string("category.new"))
+        ViewThatFits(in: .horizontal) {
+            fullStrip
+                .fixedSize(horizontal: true, vertical: false)
+            compactStrip
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, ClipFlowVisualStyle.panelPadding)
+        .padding(.vertical, 10)
+    }
+
+    private var fullStrip: some View {
+        HStack(spacing: 7) {
+            chip(.all, title: L10n.string("filter.all"), icon: "tray.full")
+            chip(.favorites, title: L10n.string("filter.favorites"), icon: "star")
+            chip(.kind(.text), title: L10n.string("filter.text"), icon: ClipboardKind.text.presentation.symbolName)
+            chip(.kind(.richText), title: L10n.string("filter.richText"), icon: ClipboardKind.richText.presentation.symbolName)
+            chip(.kind(.image), title: L10n.string("filter.images"), icon: ClipboardKind.image.presentation.symbolName)
+            chip(.kind(.file), title: L10n.string("filter.files"), icon: ClipboardKind.file.presentation.symbolName)
+            chip(.kind(.link), title: L10n.string("filter.links"), icon: ClipboardKind.link.presentation.symbolName)
+            if includesBrowserTabs {
+                chip(.browserTabs, title: L10n.string("filter.browserTabs"), icon: "macwindow.on.rectangle")
             }
-            .padding(.horizontal, ClipFlowVisualStyle.panelPadding)
-            .padding(.vertical, 10)
+            categoryChips
+            createCategoryButton
+        }
+    }
+
+    private var compactStrip: some View {
+        HStack(spacing: 7) {
+            chip(.all, title: L10n.string("filter.all"), icon: "tray.full")
+            chip(.favorites, title: L10n.string("filter.favorites"), icon: "star")
+
+            Menu {
+                overflowMenu
+            } label: {
+                FilterMenuChip(
+                    title: L10n.string("filter.more"),
+                    icon: "ellipsis.circle",
+                    isSelected: !HistoryFilterStripLayout.isPrimary(selectedFilter)
+                )
+            }
+            .menuStyle(.borderlessButton)
+            .fixedSize()
+            .help(L10n.string("filter.more"))
+        }
+    }
+
+    @ViewBuilder
+    private var categoryChips: some View {
+        ForEach(categories) { category in
+            FilterChip(
+                title: category.name,
+                icon: "folder",
+                isSelected: selectedFilter == .category(category.id)
+            ) {
+                selectFilter(.category(category.id))
+            }
+            .contextMenu {
+                Button(L10n.string("category.delete"), role: .destructive) {
+                    deleteCategory(category.id)
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var overflowMenu: some View {
+        overflowButton(
+            .kind(.text),
+            title: L10n.string("filter.text"),
+            icon: ClipboardKind.text.presentation.symbolName
+        )
+        overflowButton(
+            .kind(.richText),
+            title: L10n.string("filter.richText"),
+            icon: ClipboardKind.richText.presentation.symbolName
+        )
+        overflowButton(
+            .kind(.image),
+            title: L10n.string("filter.images"),
+            icon: ClipboardKind.image.presentation.symbolName
+        )
+        overflowButton(
+            .kind(.file),
+            title: L10n.string("filter.files"),
+            icon: ClipboardKind.file.presentation.symbolName
+        )
+        overflowButton(
+            .kind(.link),
+            title: L10n.string("filter.links"),
+            icon: ClipboardKind.link.presentation.symbolName
+        )
+        if includesBrowserTabs {
+            overflowButton(
+                .browserTabs,
+                title: L10n.string("filter.browserTabs"),
+                icon: "macwindow.on.rectangle"
+            )
+        }
+        if !categories.isEmpty {
+            Divider()
+            ForEach(categories) { category in
+                overflowButton(
+                    .category(category.id),
+                    title: category.name,
+                    icon: "folder"
+                )
+            }
+            Menu(L10n.string("category.delete"), systemImage: "trash") {
+                ForEach(categories) { category in
+                    Button(category.name, role: .destructive) {
+                        deleteCategory(category.id)
+                    }
+                }
+            }
+        }
+        Divider()
+        Button(action: createCategory) {
+            Label(L10n.string("category.new"), systemImage: "plus")
+        }
+    }
+
+    private var createCategoryButton: some View {
+        Button(action: createCategory) {
+            Image(systemName: "plus")
+                .frame(width: 24, height: 24)
+        }
+        .buttonStyle(.bordered)
+        .accessibilityLabel(L10n.string("category.new"))
+        .help(L10n.string("category.new"))
+    }
+
+    private func overflowButton(
+        _ filter: HistoryFilter,
+        title: String,
+        icon: String
+    ) -> some View {
+        Button {
+            selectFilter(filter)
+        } label: {
+            HStack(spacing: 7) {
+                Label(title, systemImage: icon)
+                Spacer(minLength: 12)
+                if selectedFilter == filter {
+                    Image(systemName: "checkmark")
+                }
+            }
         }
     }
 
@@ -608,6 +724,33 @@ private struct HistoryFilterStrip: View {
         FilterChip(title: title, icon: icon, isSelected: selectedFilter == filter) {
             selectFilter(filter)
         }
+    }
+}
+
+private struct FilterMenuChip: View {
+    let title: String
+    let icon: String
+    let isSelected: Bool
+
+    var body: some View {
+        Label(title, systemImage: icon)
+            .font(.callout.weight(.medium))
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .foregroundStyle(.primary)
+            .background(
+                isSelected ? Color.accentColor.opacity(ClipFlowVisualStyle.selectedFillOpacity) : .clear,
+                in: RoundedRectangle(cornerRadius: ClipFlowVisualStyle.controlRadius)
+            )
+            .overlay {
+                RoundedRectangle(cornerRadius: ClipFlowVisualStyle.controlRadius)
+                    .stroke(
+                        isSelected
+                            ? Color.accentColor.opacity(ClipFlowVisualStyle.selectedBorderOpacity)
+                            : ClipFlowVisualStyle.hairlineColor
+                    )
+            }
+            .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 }
 

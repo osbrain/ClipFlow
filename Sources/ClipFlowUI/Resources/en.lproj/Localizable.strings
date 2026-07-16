@@ -61,6 +61,7 @@
 "filter.files" = "Files";
 "filter.links" = "Links";
 "filter.browserTabs" = "Browser Tabs";
+"filter.more" = "More";
 "kind.text" = "Text";
 "kind.richText" = "Rich Text";
 "kind.image" = "Image";
@@ -69,6 +70,7 @@
 "kind.mixed" = "Mixed";
 "kind.unknown" = "Unknown";
 "detail.preview" = "Preview";
+"detail.fullPreview" = "Full Preview";
 "detail.paste" = "Paste";
 "detail.source" = "Source";
 "detail.kind" = "Kind";

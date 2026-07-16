@@ -5,6 +5,14 @@ import Testing
 
 @Suite("History filters")
 struct HistoryFilterTests {
+    @Test("compact filter strips keep universal filters visible")
+    func compactFilterStripPriorities() {
+        #expect(HistoryFilterStripLayout.isPrimary(.all))
+        #expect(HistoryFilterStripLayout.isPrimary(.favorites))
+        #expect(!HistoryFilterStripLayout.isPrimary(.kind(.text)))
+        #expect(!HistoryFilterStripLayout.isPrimary(.browserTabs))
+    }
+
     @Test("kind filters map to one exclusive repository kind")
     func kindMappingIsExclusive() {
         #expect(

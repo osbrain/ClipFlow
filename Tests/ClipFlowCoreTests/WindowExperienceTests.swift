@@ -5,6 +5,15 @@ import Testing
 @Suite("Window experience")
 @MainActor
 struct WindowExperienceTests {
+    @Test("main panel width stays within the product range")
+    func mainPanelWidthRange() {
+        #expect(MainPanelLayout.minimumWidth == 800)
+        #expect(MainPanelLayout.idealWidth == 960)
+        #expect(MainPanelLayout.maximumWidth == 1_080)
+        #expect(MainPanelLayout.clampedWidth(640) == 800)
+        #expect(MainPanelLayout.clampedWidth(1_800) == 1_080)
+    }
+
     @Test("main panel hides on focus loss unless a sheet is active")
     func panelDismissalPolicy() {
         #expect(PanelDismissalPolicy.shouldHideOnResign(isPresentingSheet: false))

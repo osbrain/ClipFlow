@@ -4,6 +4,26 @@ import Testing
 
 @Suite("Detail presentation")
 struct DetailPresentationTests {
+    @Test("detail previews use bounded summaries for every content mode")
+    func boundedPreviewMetrics() {
+        #expect(DetailPreviewLayout.lineLimit(for: .text) == 8)
+        #expect(DetailPreviewLayout.lineLimit(for: .link) == 5)
+        #expect(DetailPreviewLayout.lineLimit(for: .file) == 5)
+        #expect(DetailPreviewLayout.lineLimit(for: .mixed) == 6)
+        #expect(DetailPreviewLayout.lineLimit(for: .unknown) == 5)
+        #expect(DetailPreviewLayout.lineLimit(for: .image) == nil)
+        #expect(DetailPreviewLayout.imageMaximumHeight == 200)
+    }
+
+    @Test("quick look is promoted from the action stack into the preview card")
+    func promotesQuickLookIntoPreviewCard() {
+        #expect(
+            DetailActionPresentation.stackActions(from: [
+                .pasteOriginal, .pastePlainText, .quickLook
+            ]) == [.pasteOriginal, .pastePlainText]
+        )
+    }
+
     @Test("visible fields preserve the product metadata order")
     func visibleFieldsPreserveOrder() {
         let visibility = DetailFieldVisibility(

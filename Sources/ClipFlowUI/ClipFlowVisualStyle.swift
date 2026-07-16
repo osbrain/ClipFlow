@@ -1,5 +1,16 @@
 import SwiftUI
 
+public enum MainPanelLayout {
+    public static let minimumWidth: CGFloat = 800
+    public static let idealWidth: CGFloat = 960
+    public static let maximumWidth: CGFloat = 1_080
+    public static let minimumHeight: CGFloat = 520
+
+    public static func clampedWidth(_ width: CGFloat) -> CGFloat {
+        min(max(width, minimumWidth), maximumWidth)
+    }
+}
+
 enum ClipFlowVisualStyle {
     static let windowRadius: CGFloat = 18
     static let cardRadius: CGFloat = 12

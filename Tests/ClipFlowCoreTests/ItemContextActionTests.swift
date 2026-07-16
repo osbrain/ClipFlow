@@ -7,13 +7,13 @@ struct ItemContextActionTests {
     @Test("each clipboard kind exposes its exact content action matrix")
     func actionMatrix() {
         #expect(ItemContextAction.available(for: .text) == [
-            .pasteOriginal, .pastePlainText
+            .pasteOriginal, .pastePlainText, .quickLook
         ])
         #expect(ItemContextAction.available(for: .richText) == [
             .pasteOriginal, .pastePlainText, .quickLook
         ])
         #expect(ItemContextAction.available(for: .link) == [
-            .pasteOriginal, .openLink, .pastePlainText
+            .pasteOriginal, .openLink, .pastePlainText, .quickLook
         ])
         #expect(ItemContextAction.available(for: .file) == [
             .pasteOriginal, .pasteFilePath, .openFile, .revealInFinder, .quickLook

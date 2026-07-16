@@ -36,7 +36,17 @@ public enum DevelopmentDemoData {
                     """
                     ClipFlow visual acceptance
                     Review the selected item, source icon, and detail actions.
-                    Multi-line text stays readable without clipping.
+                    Long clipboard text stays inside a compact preview card.
+                    Each additional line exercises the summary height limit.
+                    Terminal output can contain many status messages.
+                    Source paths may be long and deeply nested.
+                    Error details remain selectable in the compact summary.
+                    URLs and file paths use their own truncation behavior.
+                    Images keep a bounded aspect-fit preview.
+                    Mixed clipboard records combine a thumbnail and summary.
+                    Metadata and actions remain visible below the preview.
+                    The full preview button opens the complete local payload.
+                    This final line verifies that overflow is truncated.
                     """.utf8
                 )
             ),

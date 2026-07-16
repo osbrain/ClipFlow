@@ -1,4 +1,5 @@
 import ClipFlowCore
+import CoreGraphics
 
 public enum DetailField: Equatable, Sendable {
     case source
@@ -16,6 +17,27 @@ public enum DetailPreviewMode: Equatable, Sendable {
     case link
     case mixed
     case unknown
+}
+
+public enum DetailPreviewLayout {
+    public static let imageMaximumHeight: CGFloat = 200
+
+    public static func lineLimit(for mode: DetailPreviewMode) -> Int? {
+        switch mode {
+        case .text: 8
+        case .link, .file, .unknown: 5
+        case .mixed: 6
+        case .image: nil
+        }
+    }
+}
+
+public enum DetailActionPresentation {
+    public static func stackActions(
+        from actions: [ItemContextAction]
+    ) -> [ItemContextAction] {
+        actions.filter { $0 != .quickLook }
+    }
 }
 
 public struct DetailFieldVisibility: Equatable, Sendable {

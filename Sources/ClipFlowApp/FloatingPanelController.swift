@@ -5,7 +5,10 @@ import SwiftUI
 @MainActor
 final class FloatingPanelController: NSWindowController, NSWindowDelegate {
     private let frameDefaultsKey = "panelFrame"
-    private let minimumPanelSize = NSSize(width: 800, height: 520)
+    private let minimumPanelSize = NSSize(
+        width: MainPanelLayout.minimumWidth,
+        height: MainPanelLayout.minimumHeight
+    )
     private let inputState: PanelInputStateStore
     private let frameDefaults: UserDefaults
     private let commandRouter = PanelCommandRouter()
@@ -21,7 +24,8 @@ final class FloatingPanelController: NSWindowController, NSWindowDelegate {
         self.inputState = inputState
         self.frameDefaults = frameDefaults
         self.handleCommand = handleCommand
-        let initialSize = Self.developmentPanelSize ?? NSSize(width: 1000, height: 680)
+        let initialSize = Self.developmentPanelSize
+            ?? NSSize(width: MainPanelLayout.idealWidth, height: 680)
         let panel = FloatingPanel(
             contentRect: NSRect(origin: .zero, size: initialSize),
             styleMask: [.borderless, .resizable, .fullSizeContentView],
@@ -37,6 +41,10 @@ final class FloatingPanelController: NSWindowController, NSWindowDelegate {
         panel.isOpaque = false
         panel.hasShadow = true
         panel.minSize = minimumPanelSize
+        panel.maxSize = NSSize(
+            width: MainPanelLayout.maximumWidth,
+            height: CGFloat.greatestFiniteMagnitude
+        )
         panel.contentView = NSHostingView(rootView: rootView)
         super.init(window: panel)
         panel.delegate = self
@@ -186,7 +194,10 @@ final class FloatingPanelController: NSWindowController, NSWindowDelegate {
               let height = Double(heightValue) else {
             return nil
         }
-        return NSSize(width: max(width, 800), height: max(height, 520))
+        return NSSize(
+            width: MainPanelLayout.clampedWidth(width),
+            height: max(height, MainPanelLayout.minimumHeight)
+        )
         #else
         return nil
         #endif
@@ -233,9 +244,14 @@ final class FloatingPanelController: NSWindowController, NSWindowDelegate {
     }
 
     private static func clamp(_ frame: NSRect, to visibleFrame: NSRect?) -> NSRect {
-        guard let visibleFrame else { return frame }
-        let width = min(frame.width, visibleFrame.width)
-        let height = min(frame.height, visibleFrame.height)
+        let width = min(
+            MainPanelLayout.clampedWidth(frame.width),
+            visibleFrame?.width ?? MainPanelLayout.maximumWidth
+        )
+        let height = min(frame.height, visibleFrame?.height ?? frame.height)
+        guard let visibleFrame else {
+            return NSRect(origin: frame.origin, size: NSSize(width: width, height: height))
+        }
         let x = min(max(frame.minX, visibleFrame.minX), visibleFrame.maxX - width)
         let y = min(max(frame.minY, visibleFrame.minY), visibleFrame.maxY - height)
         return NSRect(x: x, y: y, width: width, height: height)

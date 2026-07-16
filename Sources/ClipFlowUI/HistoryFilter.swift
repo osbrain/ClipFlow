@@ -38,6 +38,12 @@ public enum HistoryFilter: Equatable, Sendable {
     }
 }
 
+public enum HistoryFilterStripLayout {
+    public static func isPrimary(_ filter: HistoryFilter) -> Bool {
+        filter == .all || filter == .favorites
+    }
+}
+
 public struct HistoryRepositoryFilterState: Equatable, Sendable {
     public let kind: ClipboardKind?
     public let categoryID: UUID?

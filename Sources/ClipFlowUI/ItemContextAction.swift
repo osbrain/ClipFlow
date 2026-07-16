@@ -12,11 +12,11 @@ public enum ItemContextAction: String, CaseIterable, Equatable, Hashable, Sendab
     public static func available(for kind: ClipboardKind) -> [Self] {
         switch kind {
         case .text:
-            [.pasteOriginal, .pastePlainText]
+            [.pasteOriginal, .pastePlainText, .quickLook]
         case .richText:
             [.pasteOriginal, .pastePlainText, .quickLook]
         case .link:
-            [.pasteOriginal, .openLink, .pastePlainText]
+            [.pasteOriginal, .openLink, .pastePlainText, .quickLook]
         case .file:
             [.pasteOriginal, .pasteFilePath, .openFile, .revealInFinder, .quickLook]
         case .image:

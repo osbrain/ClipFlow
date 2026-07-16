@@ -21,7 +21,13 @@ struct DetailView: View {
                 ScrollView {
                     VStack(alignment: .leading, spacing: ClipFlowVisualStyle.sectionSpacing) {
                         SelectedSourceHeader(item: item, visual: visual)
-                        PreviewCard(item: item, visual: visual)
+                        PreviewCard(
+                            item: item,
+                            visual: visual,
+                            showFullPreview: contextActions.contains(.quickLook)
+                                ? { performContextAction(.quickLook) }
+                                : nil
+                        )
                         DetailActionStack(
                             item: item,
                             contextActions: contextActions,
@@ -141,11 +147,27 @@ private struct SelectedSourceHeader: View {
 private struct PreviewCard: View {
     let item: ClipboardItem
     let visual: ClipboardVisualDescriptor?
+    let showFullPreview: (() -> Void)?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Label(L10n.string("detail.preview"), systemImage: "eye")
-                .font(.headline)
+            HStack(spacing: 10) {
+                Label(L10n.string("detail.preview"), systemImage: "eye")
+                    .font(.headline)
+                Spacer(minLength: 8)
+                if let showFullPreview {
+                    Button(action: showFullPreview) {
+                        Label(
+                            L10n.string("detail.fullPreview"),
+                            systemImage: "arrow.up.left.and.arrow.down.right"
+                        )
+                        .font(.caption.weight(.medium))
+                    }
+                    .buttonStyle(.borderless)
+                    .controlSize(.small)
+                    .help(L10n.string("detail.fullPreview"))
+                }
+            }
 
             preview
                 .frame(maxWidth: .infinity, alignment: .topLeading)
@@ -166,16 +188,20 @@ private struct PreviewCard: View {
                 Image(nsImage: thumbnail)
                     .resizable()
                     .scaledToFit()
-                    .frame(maxWidth: .infinity, minHeight: 150, maxHeight: 300)
+                    .frame(
+                        maxWidth: .infinity,
+                        minHeight: 120,
+                        maxHeight: DetailPreviewLayout.imageMaximumHeight
+                    )
                     .clipShape(RoundedRectangle(cornerRadius: 10))
                     .accessibilityLabel(item.displayTitle)
             } else {
-                fallback(symbol: "photo", text: item.previewText)
+                fallback(symbol: "photo", text: item.previewText, lineLimit: 5)
             }
         case .file:
             HStack(alignment: .top, spacing: 12) {
                 if let thumbnail = visual?.thumbnail {
-                    adjacentThumbnail(thumbnail, size: 64)
+                    adjacentThumbnail(thumbnail, size: 56)
                 } else {
                     ClipboardKindBadge(kind: .file, size: 46)
                         .accessibilityHidden(true)
@@ -183,7 +209,8 @@ private struct PreviewCard: View {
                 Text(normalizedFilePath)
                     .font(.body.monospaced())
                     .textSelection(.enabled)
-                    .fixedSize(horizontal: false, vertical: true)
+                    .lineLimit(DetailPreviewLayout.lineLimit(for: .file))
+                    .truncationMode(.tail)
             }
         case .link:
             HStack(alignment: .top, spacing: 10) {
@@ -193,26 +220,33 @@ private struct PreviewCard: View {
                 Text(item.previewText)
                     .foregroundStyle(.tint)
                     .textSelection(.enabled)
-                    .fixedSize(horizontal: false, vertical: true)
+                    .lineLimit(DetailPreviewLayout.lineLimit(for: .link))
+                    .truncationMode(.middle)
             }
         case .text:
             Text(item.previewText)
                 .textSelection(.enabled)
-                .fixedSize(horizontal: false, vertical: true)
+                .lineLimit(DetailPreviewLayout.lineLimit(for: .text))
+                .truncationMode(.tail)
         case .mixed:
             HStack(alignment: .top, spacing: 12) {
                 if let thumbnail = visual?.thumbnail {
-                    adjacentThumbnail(thumbnail, size: 72)
+                    adjacentThumbnail(thumbnail, size: 56)
                 } else {
                     ClipboardKindBadge(kind: .mixed, size: 46)
                         .accessibilityHidden(true)
                 }
                 Text(item.previewText)
                     .textSelection(.enabled)
-                    .fixedSize(horizontal: false, vertical: true)
+                    .lineLimit(DetailPreviewLayout.lineLimit(for: .mixed))
+                    .truncationMode(.tail)
             }
         case .unknown:
-            fallback(symbol: "questionmark.square.dashed", text: item.previewText)
+            fallback(
+                symbol: "questionmark.square.dashed",
+                text: item.previewText,
+                lineLimit: DetailPreviewLayout.lineLimit(for: .unknown)
+            )
         }
     }
 
@@ -224,7 +258,7 @@ private struct PreviewCard: View {
         return NSString(string: value).standardizingPath
     }
 
-    private func fallback(symbol: String, text: String) -> some View {
+    private func fallback(symbol: String, text: String, lineLimit: Int?) -> some View {
         HStack(alignment: .top, spacing: 12) {
             Image(systemName: symbol)
                 .font(.system(size: 28, weight: .medium))
@@ -232,7 +266,8 @@ private struct PreviewCard: View {
                 .accessibilityHidden(true)
             Text(text)
                 .textSelection(.enabled)
-                .fixedSize(horizontal: false, vertical: true)
+                .lineLimit(lineLimit)
+                .truncationMode(.tail)
         }
     }
 
@@ -262,11 +297,13 @@ private struct DetailActionStack: View {
 
     var body: some View {
         VStack(spacing: 9) {
-            if contextActions.contains(.pasteOriginal) {
+            let stackActions = DetailActionPresentation.stackActions(from: contextActions)
+
+            if stackActions.contains(.pasteOriginal) {
                 contextActionButton(.pasteOriginal)
             }
 
-            let secondaryActions = contextActions.filter { $0 != .pasteOriginal }
+            let secondaryActions = stackActions.filter { $0 != .pasteOriginal }
             if !secondaryActions.isEmpty {
                 LazyVGrid(
                     columns: secondaryActions.count == 1
