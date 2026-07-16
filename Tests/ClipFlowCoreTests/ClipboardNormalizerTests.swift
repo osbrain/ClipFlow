@@ -140,6 +140,86 @@ struct ClipboardNormalizerTests {
         #expect(try normalizer.normalize(fileAndTextCapture()).kind == .mixed)
     }
 
+    @Test("Equivalent rich representations share a semantic hash")
+    func equivalentRichRepresentationsShareHash() throws {
+        let plain = try normalizer.normalize(capture(representations: [
+            RawClipboardRepresentation(
+                type: "public.utf8-plain-text",
+                data: Data("Hello\r\nworld".utf8)
+            )
+        ]))
+        let rich = try normalizer.normalize(capture(representations: [
+            RawClipboardRepresentation(
+                type: "public.html",
+                data: Data("<p>Hello<br>world</p>".utf8)
+            ),
+            RawClipboardRepresentation(
+                type: "public.rtf",
+                data: Data("{\\rtf1 Hello\\line world}".utf8)
+            ),
+            RawClipboardRepresentation(
+                type: "public.utf8-plain-text",
+                data: Data("Hello\nworld".utf8)
+            )
+        ]))
+
+        #expect(plain.contentHash == rich.contentHash)
+    }
+
+    @Test("Plain and advertised URLs share a canonical semantic hash")
+    func equivalentURLRepresentationsShareHash() throws {
+        let plain = try normalizeText("https://EXAMPLE.com/path?q=1")
+        let advertised = try normalizer.normalize(capture(representations: [
+            RawClipboardRepresentation(
+                type: "public.url",
+                data: Data("HTTPS://example.com/path?q=1".utf8)
+            ),
+            RawClipboardRepresentation(
+                type: "public.utf8-plain-text",
+                data: Data("Example page".utf8)
+            )
+        ]))
+
+        #expect(plain.contentHash == advertised.contentHash)
+    }
+
+    @Test("File companion formats do not change semantic identity")
+    func equivalentFileRepresentationsShareHash() throws {
+        let fileURL = URL(fileURLWithPath: "/tmp/../tmp/report.pdf")
+        let canonicalURL = URL(fileURLWithPath: "/tmp/report.pdf")
+        let first = try normalizer.normalize(capture(representations: [
+            RawClipboardRepresentation(
+                type: "public.file-url",
+                data: fileURL.dataRepresentation
+            ),
+            RawClipboardRepresentation(
+                type: "com.apple.finder.node",
+                data: Data([1, 2, 3])
+            )
+        ]))
+        let second = try normalizer.normalize(capture(representations: [
+            RawClipboardRepresentation(
+                type: "public.file-url",
+                data: canonicalURL.dataRepresentation
+            ),
+            RawClipboardRepresentation(
+                type: "public.utf8-plain-text",
+                data: Data(canonicalURL.path.utf8)
+            )
+        ]))
+
+        #expect(first.contentHash == second.contentHash)
+    }
+
+    @Test("Distinct semantic values keep distinct hashes")
+    func distinctValuesKeepDistinctHashes() throws {
+        #expect(try normalizeText("Alpha").contentHash != normalizeText("alpha").contentHash)
+        #expect(
+            try normalizeText("https://example.com/a").contentHash
+                != normalizeText("https://example.com/b").contentHash
+        )
+    }
+
     private func capture(
         representations: [RawClipboardRepresentation]
     ) -> RawClipboardCapture {

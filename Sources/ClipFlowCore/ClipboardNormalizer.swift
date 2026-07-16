@@ -135,7 +135,7 @@ public struct ClipboardNormalizer: Sendable {
                 locale: .current
             ),
             byteSize: totalBytes,
-            contentHash: Self.contentHash(for: accepted),
+            contentHash: Self.semanticContentHash(for: accepted),
             payloads: accepted
         )
     }
@@ -263,16 +263,122 @@ public struct ClipboardNormalizer: Sendable {
         return url
     }
 
-    private static func contentHash(for payloads: [NormalizedPayload]) -> String {
+    private static func semanticContentHash(for payloads: [NormalizedPayload]) -> String {
         var hasher = SHA256()
+        update(&hasher, data: Data("clipflow-semantic-v1".utf8))
 
-        for payload in payloads {
-            update(&hasher, integer: payload.itemIndex)
-            update(&hasher, data: Data(payload.type.utf8))
-            update(&hasher, data: payload.data)
+        for (itemIndex, itemPayloads) in Dictionary(grouping: payloads, by: \.itemIndex)
+            .sorted(by: { $0.key < $1.key }) {
+            let kind = semanticKind(for: itemPayloads)
+            update(&hasher, integer: itemIndex)
+            update(&hasher, data: Data(semanticDomain(for: kind).utf8))
+            update(&hasher, data: semanticIdentity(for: itemPayloads, kind: kind))
         }
 
         return hasher.finalize().map { String(format: "%02x", $0) }.joined()
+    }
+
+    private static func semanticDomain(for kind: ClipboardKind) -> String {
+        switch kind {
+        case .text, .richText:
+            "text"
+        default:
+            kind.rawValue
+        }
+    }
+
+    private static func semanticIdentity(
+        for payloads: [NormalizedPayload],
+        kind: ClipboardKind
+    ) -> Data {
+        switch kind {
+        case .text, .richText:
+            if let text = decodedPlainText(in: payloads) {
+                return Data(normalizeLineEndings(text).utf8)
+            }
+        case .link:
+            if let url = representedURL(in: payloads, fileURL: false)
+                ?? decodedPlainText(in: payloads).flatMap(inferredWebURL(from:)) {
+                return Data(canonicalWebURL(url).utf8)
+            }
+        case .file:
+            if let url = representedURL(in: payloads, fileURL: true)
+                ?? decodedPlainText(in: payloads).flatMap(inferredFileURL(from:)) {
+                return Data(url.standardizedFileURL.absoluteString.utf8)
+            }
+        case .image:
+            if let payload = preferredBinaryPayload(in: payloads) {
+                var identity = Data(payload.type.utf8)
+                identity.append(0)
+                identity.append(payload.data)
+                return identity
+            }
+        case .mixed, .unknown:
+            break
+        }
+
+        return fullPayloadIdentity(payloads)
+    }
+
+    private static func representedURL(
+        in payloads: [NormalizedPayload],
+        fileURL: Bool
+    ) -> URL? {
+        let candidates = payloads.filter { payload in
+            fileURL ? isFileRepresentation(payload) : isURLRepresentation(payload)
+        }.sorted { $0.type < $1.type }
+
+        for payload in candidates {
+            if let url = URL(dataRepresentation: payload.data, relativeTo: nil),
+               url.isFileURL == fileURL {
+                return url
+            }
+            if let value = String(data: payload.data, encoding: .utf8),
+               let url = URL(string: value.trimmingCharacters(in: .whitespacesAndNewlines)),
+               url.isFileURL == fileURL {
+                return url
+            }
+        }
+        return nil
+    }
+
+    private static func canonicalWebURL(_ url: URL) -> String {
+        guard var components = URLComponents(
+            url: url,
+            resolvingAgainstBaseURL: false
+        ) else {
+            return url.absoluteString
+        }
+        components.scheme = components.scheme?.lowercased()
+        components.host = components.host?.lowercased()
+        return components.string ?? url.absoluteString
+    }
+
+    private static func preferredBinaryPayload(
+        in payloads: [NormalizedPayload]
+    ) -> NormalizedPayload? {
+        let typePriority = [
+            "public.png", "public.tiff", "public.jpeg", "public.heic",
+            "com.compuserve.gif", "com.adobe.pdf"
+        ]
+        for type in typePriority {
+            if let payload = payloads.first(where: { $0.type == type }) {
+                return payload
+            }
+        }
+        return payloads.sorted { $0.type < $1.type }.first
+    }
+
+    private static func fullPayloadIdentity(_ payloads: [NormalizedPayload]) -> Data {
+        var hasher = SHA256()
+        for payload in payloads.sorted(by: {
+            if $0.type != $1.type { return $0.type < $1.type }
+            return $0.data.lexicographicallyPrecedes($1.data)
+        }) {
+            update(&hasher, data: Data(payload.type.utf8))
+            update(&hasher, data: payload.data)
+        }
+        return Data(hasher.finalize())
     }
 
     private static func update(_ hasher: inout SHA256, integer: Int) {
