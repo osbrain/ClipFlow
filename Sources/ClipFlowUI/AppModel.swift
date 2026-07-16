@@ -235,6 +235,10 @@ public final class AppModel {
             }
             visuals[refreshedItem.id] = descriptor
         }
+        if selectedItemID == nil {
+            selectedItemID = items.first?.id
+        }
+        errorMessage = nil
         return true
     }
 

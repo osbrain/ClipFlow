@@ -30,12 +30,15 @@ public enum HistoryTimePresentation {
             return localized("history.time.yesterday", locale: locale)
         }
 
-        let formatter = DateFormatter()
-        formatter.locale = locale
-        formatter.calendar = calendar
-        formatter.timeZone = calendar.timeZone
-        formatter.setLocalizedDateFormatFromTemplate("MMM d")
-        return formatter.string(from: date)
+        return date.formatted(
+            Date.FormatStyle(
+                date: .abbreviated,
+                time: .omitted,
+                locale: locale,
+                calendar: calendar,
+                timeZone: calendar.timeZone
+            )
+        )
     }
 
     private static func localized(_ key: String, locale: Locale) -> String {

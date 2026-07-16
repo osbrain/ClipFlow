@@ -47,7 +47,6 @@ struct ClipboardCaptureProcessorTests {
             item: item,
             disposition: .inserted
         )
-        repository.replaceItems(with: [item])
         let model = AppModel(repository: repository, pasteService: CaptureTestPasteService())
         await model.reload()
         let processor = ClipboardCaptureProcessor(
@@ -143,6 +142,16 @@ private final class CaptureTestRepository:
     ) throws -> ClipboardUpsertResult {
         try lock.withLock {
             guard let nextUpsertResult else { throw CaptureTestError.missingResult }
+            switch nextUpsertResult.disposition {
+            case .inserted:
+                items.insert(nextUpsertResult.item, at: 0)
+            case .refreshed:
+                if let index = items.firstIndex(where: {
+                    $0.id == nextUpsertResult.item.id
+                }) {
+                    items[index] = nextUpsertResult.item
+                }
+            }
             return nextUpsertResult
         }
     }

@@ -50,7 +50,7 @@ No video is rendered by ClipFlow. Avoiding per-row live blur prevents a dynamic 
 
 - The normal history view loads a bounded first page large enough for ordinary use; filtering/searching can request additional rows through the repository API without changing visible behavior.
 - Thumbnail and visual metadata work remains lazy and must only start for selected or visible content.
-- Retention cleanup runs only after a successful insert or meaningful duplicate refresh, never for unchanged pasteboard polls.
+- Retention cleanup runs only after a successful insert. A duplicate refresh does not increase storage and skips cleanup, while unchanged pasteboard polls perform no repository work.
 - Performance tests use deterministic temporary databases and generous upper bounds intended to detect algorithmic regressions rather than benchmark machine speed.
 
 ## Verification

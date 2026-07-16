@@ -28,7 +28,9 @@ public struct SQLRow: Equatable, Sendable {
 public final class SQLCipherDatabase: @unchecked Sendable {
     private let connection: OpaquePointer
     private let lock = NSRecursiveLock()
+    #if DEBUG
     private var queryObserver: (@Sendable (String) -> Void)?
+    #endif
 
     public let cipherVersion: String
 
@@ -113,7 +115,9 @@ public final class SQLCipherDatabase: @unchecked Sendable {
 
     public func query(_ sql: String, bindings: [SQLValue] = []) throws -> [SQLRow] {
         try lock.withLock {
+            #if DEBUG
             queryObserver?(sql)
+            #endif
             let statement = try Self.prepare(connection: connection, sql: sql)
             defer { sqlite3_finalize(statement) }
             try Self.bind(bindings, to: statement, connection: connection, sql: sql)
@@ -136,11 +140,13 @@ public final class SQLCipherDatabase: @unchecked Sendable {
         }
     }
 
+    #if DEBUG
     func setQueryObserver(_ observer: (@Sendable (String) -> Void)?) {
         lock.withLock {
             queryObserver = observer
         }
     }
+    #endif
 
     public func transaction<T>(_ body: (SQLCipherDatabase) throws -> T) throws -> T {
         try lock.withLock {
