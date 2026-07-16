@@ -34,7 +34,7 @@ final class FloatingPanelController: NSWindowController, NSWindowDelegate {
         )
         panel.level = .floating
         panel.isReleasedWhenClosed = false
-        panel.hidesOnDeactivate = true
+        panel.hidesOnDeactivate = PanelDismissalPolicy.hidesOnApplicationDeactivate
         panel.isMovableByWindowBackground = true
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .transient]
         panel.backgroundColor = .clear

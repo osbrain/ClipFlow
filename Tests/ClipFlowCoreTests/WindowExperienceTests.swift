@@ -22,12 +22,26 @@ struct WindowExperienceTests {
 
     @Test("main panel hides on focus loss unless a sheet is active")
     func panelDismissalPolicy() {
+        #expect(!PanelDismissalPolicy.hidesOnApplicationDeactivate)
         #expect(PanelDismissalPolicy.shouldHideOnResign(isPresentingSheet: false))
         #expect(!PanelDismissalPolicy.shouldHideOnResign(isPresentingSheet: true))
         #expect(
             !PanelDismissalPolicy.shouldHideOnResign(
                 isPresentingSheet: false,
                 isPresentingOnboarding: true
+            )
+        )
+    }
+
+    @Test("first launch protects onboarding before the panel becomes visible")
+    func onboardingStartupState() {
+        let state = PanelInputStateStore(isPresentingOnboarding: true)
+
+        #expect(state.isPresentingOnboarding)
+        #expect(
+            !PanelDismissalPolicy.shouldHideOnResign(
+                isPresentingSheet: state.isPresentingSheet,
+                isPresentingOnboarding: state.isPresentingOnboarding
             )
         )
     }

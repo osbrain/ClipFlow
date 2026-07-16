@@ -175,7 +175,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             let browserService: any BrowserTabServing = BrowserAutomation()
             #endif
             let browserModel = BrowserTabModel(service: browserService)
-            let inputState = PanelInputStateStore()
+            let inputState = PanelInputStateStore(
+                isPresentingOnboarding: !runtimeDefaults.bool(
+                    forKey: "hasCompletedOnboarding"
+                )
+            )
             #if DEBUG
             if ProcessInfo.processInfo.environment["CLIPFLOW_SHOW_BROWSER_TABS"] == "1" {
                 browserModel.isShowing = true

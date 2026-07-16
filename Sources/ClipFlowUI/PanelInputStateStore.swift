@@ -33,7 +33,9 @@ public final class PanelInputStateStore {
     public var isPanelVisible = false
     public private(set) var requestedListFocus: PanelListFocusRequest?
 
-    public init() {}
+    public init(isPresentingOnboarding: Bool = false) {
+        self.isPresentingOnboarding = isPresentingOnboarding
+    }
 
     public var commandContext: PanelCommandContext {
         PanelCommandContext(
