@@ -431,6 +431,13 @@ capture_scenario \
 capture_scenario \
     "light-en-compact" "en" "en_US" "light" "compact" 800 520 "" 1
 capture_scenario \
+    "light-zh-onboarding" "zh-Hans" "zh_CN" "light" "comfortable" 800 520 "" 1 \
+    "CLIPFLOW_SHOW_ONBOARDING=1"
+capture_scenario \
+    "light-zh-onboarding-granted" "zh-Hans" "zh_CN" "light" "comfortable" 800 520 "" 1 \
+    "CLIPFLOW_SHOW_ONBOARDING=1" \
+    "CLIPFLOW_ACCESSIBILITY_GRANTED=1"
+capture_scenario \
     "light-en-settings" "en" "en_US" "light" "comfortable" 1000 680 "__SETTINGS__" 0 \
     "CLIPFLOW_SHOW_SETTINGS=1"
 capture_scenario \

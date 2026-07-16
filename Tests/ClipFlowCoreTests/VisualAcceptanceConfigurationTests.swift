@@ -63,6 +63,25 @@ struct VisualAcceptanceConfigurationTests {
         #expect(configuration.listDensity == .compact)
         #expect(!configuration.browserTabManagementEnabled)
         #expect(configuration.selectedKind == .file)
+        #expect(!configuration.showsOnboarding)
+        #expect(!configuration.accessibilityTrusted)
+    }
+
+    @Test("onboarding capture is enabled only by its explicit environment flag")
+    func parsesOnboardingCaptureFlag() throws {
+        let configuration = try #require(VisualAcceptanceConfiguration.validated(
+            environment: [
+                "CLIPFLOW_VISUAL_ACCEPTANCE": "1",
+                "CLIPFLOW_ACCEPTANCE_TOKEN": "capture-onboarding",
+                "CLIPFLOW_DEVELOPMENT_DATA_DIR": "/tmp/clipflow-onboarding",
+                "CLIPFLOW_SHOW_ONBOARDING": "1",
+                "CLIPFLOW_ACCESSIBILITY_GRANTED": "1"
+            ],
+            arguments: ["ClipFlowApp"]
+        ))
+
+        #expect(configuration.showsOnboarding)
+        #expect(configuration.accessibilityTrusted)
     }
 
     @Test("unknown selected kinds fall back to the default selection")

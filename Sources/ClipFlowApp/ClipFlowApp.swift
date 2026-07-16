@@ -60,8 +60,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 visualAcceptanceConfiguration: visualAcceptanceConfiguration
             )
             let logURL = support.appendingPathComponent("ClipFlow.log")
+            #if DEBUG
+            let permissionStatus: any PermissionStatusProviding =
+                visualAcceptanceConfiguration?.showsOnboarding == true
+                    ? DevelopmentFixedPermissionStatus(
+                        isTrusted: visualAcceptanceConfiguration?.accessibilityTrusted == true
+                    )
+                    : SystemPermissionStatus()
+            #else
+            let permissionStatus: any PermissionStatusProviding = SystemPermissionStatus()
+            #endif
             let settings = SettingsModel(
                 store: runtimeDefaults,
+                permissions: permissionStatus,
                 diagnosticLogURL: logURL
             )
             L10n.configure(language: settings.appLanguage)
@@ -783,7 +794,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         defaults.set(false, forKey: "showStatusBarItem")
         defaults.set(false, forKey: "launchAtLogin")
         defaults.set(RetentionPreference.unlimited.rawValue, forKey: "retentionPolicy")
-        defaults.set(true, forKey: "hasCompletedOnboarding")
+        defaults.set(!configuration.showsOnboarding, forKey: "hasCompletedOnboarding")
         return defaults
     }
 
@@ -878,5 +889,13 @@ private struct DevelopmentEmptyBrowserTabService: BrowserTabServing {
     }
 
     func activate(_ tab: BrowserTab) throws {}
+}
+
+private struct DevelopmentFixedPermissionStatus: PermissionStatusProviding {
+    let isTrusted: Bool
+
+    func isAccessibilityTrusted() -> Bool { isTrusted }
+    func requestAccessibilityAuthorization() -> Bool { isTrusted }
+    func resetAccessibilityAuthorization() {}
 }
 #endif
