@@ -6,32 +6,56 @@ import ClipFlowCore
 
 @Suite("Encrypted clipboard repository")
 struct ClipboardRepositoryTests {
-    @Test("deduplicates by hash and searches the updated item")
-    func insertDeduplicatesByHashAndSearchesUpdatedItem() throws {
-        let harness = try RepositoryHarness()
+    @Test("duplicate refresh preserves payloads and user metadata")
+    func duplicateRefreshPreservesPayloadsAndUserMetadata() throws {
+        let harness = try RepositoryHarness(externalThresholdBytes: 1)
         defer { harness.cleanup() }
-
+        let firstDate = Date(timeIntervalSince1970: 1_700_000_000)
+        let secondDate = firstDate.addingTimeInterval(120)
         let first = try harness.repository.upsert(
-            harness.capture(hash: "same", preview: "First")
+            harness.dataCapture(
+                hash: "same",
+                byteCount: 32,
+                sourceAppName: "Notes",
+                sourceBundleID: "com.apple.Notes",
+                fillByte: 0x55
+            ),
+            timestamp: firstDate
         )
+        try harness.repository.setFavorite(true, for: first.item.id)
+        try harness.repository.rename(first.item.id, title: "Keep me")
+        let category = try harness.repository.createCategory(name: "Work")
+        try harness.repository.assign(itemID: first.item.id, categoryID: category.id)
+        let externalFilesBefore = try harness.externalPayloadFileNames()
         let ignoredReplacementID = UUID()
         let second = try harness.repository.upsert(
-            harness.capture(hash: "same", preview: "Second"),
-            itemID: ignoredReplacementID
-        )
-        let results = try harness.repository.search(
-            SearchQuery(
-                text: "Second",
-                categoryID: nil,
-                kind: nil,
-                favoritesOnly: false
-            )
+            harness.dataCapture(
+                hash: "same",
+                byteCount: 32,
+                sourceAppName: "Safari",
+                sourceBundleID: "com.apple.Safari",
+                fillByte: 0x66
+            ),
+            itemID: ignoredReplacementID,
+            timestamp: secondDate
         )
 
-        #expect(first.id == second.id)
-        #expect(second.id != ignoredReplacementID)
-        #expect(results.map(\.id) == [first.id])
-        #expect(try harness.repository.payloads(for: first.id).first?.data == Data("Second".utf8))
+        #expect(first.disposition == .inserted)
+        #expect(second.disposition == .refreshed)
+        #expect(first.item.id == second.item.id)
+        #expect(second.item.id != ignoredReplacementID)
+        #expect(second.item.updatedAt == secondDate)
+        #expect(second.item.appName == "Safari")
+        #expect(second.item.bundleID == "com.apple.Safari")
+        #expect(second.item.previewText == first.item.previewText)
+        #expect(second.item.isFavorite)
+        #expect(second.item.customTitle == "Keep me")
+        #expect(try harness.repository.categories(for: first.item.id).map(\.id) == [category.id])
+        #expect(
+            try harness.repository.payloads(for: first.item.id).first?.data
+                == Data(repeating: 0x55, count: 32)
+        )
+        #expect(try harness.externalPayloadFileNames() == externalFilesBefore)
     }
 
     @Test("deleting a category does not delete its clipboard item")
@@ -43,11 +67,11 @@ struct ClipboardRepositoryTests {
             harness.capture(hash: "a", preview: "A")
         )
         let category = try harness.repository.createCategory(name: "Work")
-        try harness.repository.assign(itemID: item.id, categoryID: category.id)
+        try harness.repository.assign(itemID: item.item.id, categoryID: category.id)
         try harness.repository.deleteCategory(category.id)
 
-        #expect(try harness.repository.item(id: item.id) != nil)
-        #expect(try harness.repository.categories(for: item.id).isEmpty)
+        #expect(try harness.repository.item(id: item.item.id) != nil)
+        #expect(try harness.repository.categories(for: item.item.id).isEmpty)
     }
 
     @Test("supplied timestamps persist and determine search order")
@@ -73,13 +97,13 @@ struct ClipboardRepositoryTests {
             SearchQuery(text: "", categoryID: nil, kind: nil, favoritesOnly: false)
         )
 
-        #expect(older.id == olderID)
-        #expect(older.createdAt == olderDate)
-        #expect(older.updatedAt == olderDate)
-        #expect(newer.id == newerID)
-        #expect(newer.createdAt == newerDate)
-        #expect(newer.updatedAt == newerDate)
-        #expect(results.map(\.id).prefix(2) == [newer.id, older.id])
+        #expect(older.item.id == olderID)
+        #expect(older.item.createdAt == olderDate)
+        #expect(older.item.updatedAt == olderDate)
+        #expect(newer.item.id == newerID)
+        #expect(newer.item.createdAt == newerDate)
+        #expect(newer.item.updatedAt == newerDate)
+        #expect(results.map(\.id).prefix(2) == [newer.item.id, older.item.id])
     }
 
     @Test("reclassifies stored Finder records without losing user metadata")
@@ -134,7 +158,7 @@ struct ClipboardRepositoryTests {
         let repaired = try #require(fetched)
 
         #expect(updatedCount == 1)
-        #expect(repaired.id == original.id)
+        #expect(repaired.id == original.item.id)
         #expect(repaired.kind == .file)
         #expect(repaired.isFavorite)
         #expect(repaired.customTitle == "Quarterly Report")
@@ -153,8 +177,8 @@ struct ClipboardRepositoryTests {
             harness.dataCapture(hash: "threshold", byteCount: 16)
         )
 
-        #expect(item.hasExternalPayload)
-        #expect(try harness.repository.payloads(for: item.id).first?.data.count == 16)
+        #expect(item.item.hasExternalPayload)
+        #expect(try harness.repository.payloads(for: item.item.id).first?.data.count == 16)
     }
 
     @Test("retention deletes oldest non-favorites and their external payloads")
@@ -166,7 +190,7 @@ struct ClipboardRepositoryTests {
             harness.dataCapture(hash: "favorite", byteCount: 32),
             timestamp: base
         )
-        try harness.repository.setFavorite(true, for: favorite.id)
+        try harness.repository.setFavorite(true, for: favorite.item.id)
         let oldest = try harness.repository.upsert(
             harness.dataCapture(hash: "oldest", byteCount: 32),
             timestamp: base.addingTimeInterval(10)
@@ -181,10 +205,10 @@ struct ClipboardRepositoryTests {
             now: base.addingTimeInterval(30)
         )
 
-        #expect(deleted == [oldest.id])
-        #expect(try harness.repository.item(id: oldest.id) == nil)
-        #expect(try harness.repository.item(id: favorite.id) != nil)
-        #expect(try harness.repository.item(id: newest.id) != nil)
+        #expect(deleted == [oldest.item.id])
+        #expect(try harness.repository.item(id: oldest.item.id) == nil)
+        #expect(try harness.repository.item(id: favorite.item.id) != nil)
+        #expect(try harness.repository.item(id: newest.item.id) != nil)
         #expect(try harness.externalPayloadFileCount() == 2)
     }
 }
@@ -230,10 +254,16 @@ private final class RepositoryHarness {
         )
     }
 
-    func dataCapture(hash: String, byteCount: Int) -> NormalizedCapture {
+    func dataCapture(
+        hash: String,
+        byteCount: Int,
+        sourceAppName: String = "Test",
+        sourceBundleID: String? = nil,
+        fillByte: UInt8 = 0x55
+    ) -> NormalizedCapture {
         NormalizedCapture(
-            sourceAppName: "Test",
-            sourceBundleID: nil,
+            sourceAppName: sourceAppName,
+            sourceBundleID: sourceBundleID,
             kind: .unknown,
             previewText: "Binary data",
             searchText: "binary data",
@@ -243,10 +273,19 @@ private final class RepositoryHarness {
                 NormalizedPayload(
                     itemIndex: 0,
                     type: "public.data",
-                    data: Data(repeating: 0x55, count: byteCount)
+                    data: Data(repeating: fillByte, count: byteCount)
                 )
             ]
         )
+    }
+
+    func externalPayloadFileNames() throws -> [String] {
+        let directory = root.appendingPathComponent("Payloads", isDirectory: true)
+        guard FileManager.default.fileExists(atPath: directory.path) else { return [] }
+        return try FileManager.default.contentsOfDirectory(
+            at: directory,
+            includingPropertiesForKeys: nil
+        ).map(\.lastPathComponent).sorted()
     }
 
     func externalPayloadFileCount() throws -> Int {

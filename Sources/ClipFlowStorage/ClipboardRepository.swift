@@ -8,6 +8,21 @@ public struct RepositoryPayload: Equatable, Sendable {
     public let data: Data
 }
 
+public enum ClipboardUpsertDisposition: Equatable, Sendable {
+    case inserted
+    case refreshed
+}
+
+public struct ClipboardUpsertResult: Equatable, Sendable {
+    public let item: ClipboardItem
+    public let disposition: ClipboardUpsertDisposition
+
+    public init(item: ClipboardItem, disposition: ClipboardUpsertDisposition) {
+        self.item = item
+        self.disposition = disposition
+    }
+}
+
 public final class ClipboardRepository: @unchecked Sendable {
     private let database: SQLCipherDatabase
     private let externalPayloadStore: ExternalPayloadStore
@@ -35,22 +50,55 @@ public final class ClipboardRepository: @unchecked Sendable {
         _ capture: NormalizedCapture,
         itemID: UUID? = nil,
         timestamp: Date = Date()
-    ) throws -> ClipboardItem {
+    ) throws -> ClipboardUpsertResult {
+        if let existing = try database.query(
+            Self.itemSelect + " WHERE content_hash = ? LIMIT 1;",
+            bindings: [.text(capture.contentHash)]
+        ).first.flatMap(Self.decodeItem) {
+            try database.execute(
+                """
+                UPDATE clipboard_items
+                SET updated_at = ?, app_name = ?, bundle_id = ?
+                WHERE id = ?;
+                """,
+                bindings: [
+                    .real(timestamp.timeIntervalSince1970),
+                    .text(capture.sourceAppName),
+                    capture.sourceBundleID.map(SQLValue.text) ?? .null,
+                    .text(existing.id.uuidString)
+                ]
+            )
+            return ClipboardUpsertResult(
+                item: ClipboardItem(
+                    id: existing.id,
+                    createdAt: existing.createdAt,
+                    updatedAt: timestamp,
+                    appName: capture.sourceAppName,
+                    bundleID: capture.sourceBundleID,
+                    kind: existing.kind,
+                    previewText: existing.previewText,
+                    searchText: existing.searchText,
+                    byteSize: existing.byteSize,
+                    contentHash: existing.contentHash,
+                    isFavorite: existing.isFavorite,
+                    lastUsedAt: existing.lastUsedAt,
+                    customTitle: existing.customTitle,
+                    hasExternalPayload: existing.hasExternalPayload
+                ),
+                disposition: .refreshed
+            )
+        }
+
         let externalThresholdBytes = configurationLock.withLock {
             configuredExternalThresholdBytes
         }
-        let existing = try database.query(
-            "SELECT id, created_at, is_favorite, last_used_at, custom_title FROM clipboard_items WHERE content_hash = ?;",
-            bindings: [.text(capture.contentHash)]
-        ).first
-        let id = existing?.uuid("id") ?? itemID ?? UUID()
-        let createdAt = existing?.date("created_at") ?? timestamp
+        let id = itemID ?? UUID()
+        let createdAt = timestamp
         let now = timestamp
-        let favorite = existing?.bool("is_favorite") ?? false
-        let lastUsed = existing?.date("last_used_at")
-        let customTitle = existing?.string("custom_title")
+        let favorite = false
+        let lastUsed: Date? = nil
+        let customTitle: String? = nil
 
-        let oldReferences = try externalReferences(for: id)
         var newReferences: [ExternalPayloadReference] = []
         var preparedPayloads: [(NormalizedPayload, Data?, ExternalPayloadReference?)] = []
 
@@ -121,15 +169,17 @@ public final class ClipboardRepository: @unchecked Sendable {
             throw error
         }
 
-        for reference in oldReferences { try? externalPayloadStore.delete(reference) }
-        return ClipboardItem(
-            id: id, createdAt: createdAt, updatedAt: now,
-            appName: capture.sourceAppName, bundleID: capture.sourceBundleID,
-            kind: capture.kind, previewText: capture.previewText,
-            searchText: capture.searchText, byteSize: capture.byteSize,
-            contentHash: capture.contentHash, isFavorite: favorite,
-            lastUsedAt: lastUsed, customTitle: customTitle,
-            hasExternalPayload: !newReferences.isEmpty
+        return ClipboardUpsertResult(
+            item: ClipboardItem(
+                id: id, createdAt: createdAt, updatedAt: now,
+                appName: capture.sourceAppName, bundleID: capture.sourceBundleID,
+                kind: capture.kind, previewText: capture.previewText,
+                searchText: capture.searchText, byteSize: capture.byteSize,
+                contentHash: capture.contentHash, isFavorite: favorite,
+                lastUsedAt: lastUsed, customTitle: customTitle,
+                hasExternalPayload: !newReferences.isEmpty
+            ),
+            disposition: .inserted
         )
     }
 
