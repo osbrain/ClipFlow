@@ -23,6 +23,13 @@ enum Migrations {
                     bindings: [.integer(1), .real(Date().timeIntervalSince1970)]
                 )
             }
+            if current < 2 {
+                try database.execute(schemaV2)
+                try database.execute(
+                    "INSERT INTO schema_migrations(version, applied_at) VALUES (?, ?);",
+                    bindings: [.integer(2), .real(Date().timeIntervalSince1970)]
+                )
+            }
         }
     }
 
@@ -83,6 +90,14 @@ enum Migrations {
         CREATE TRIGGER clipboard_items_fts_delete AFTER DELETE ON clipboard_items BEGIN
             DELETE FROM clipboard_items_fts WHERE item_id = old.id;
         END;
+        """
+
+    private static let schemaV2 = """
+        CREATE INDEX IF NOT EXISTS idx_items_recency
+        ON clipboard_items(
+            COALESCE(last_used_at, updated_at) DESC,
+            updated_at DESC
+        );
         """
 }
 
