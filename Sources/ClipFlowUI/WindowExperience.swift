@@ -48,6 +48,20 @@ public enum SettingsWindowMinimizeBehavior {
 
 @MainActor
 enum ClipFlowScrollAppearance {
+    static func scrollViews(in root: NSView) -> [NSScrollView] {
+        var result = (root as? NSScrollView).map { [$0] } ?? []
+        for subview in root.subviews {
+            result.append(contentsOf: scrollViews(in: subview))
+        }
+        return result
+    }
+
+    static func apply(to root: NSView) {
+        for scrollView in scrollViews(in: root) {
+            apply(to: scrollView)
+        }
+    }
+
     static func apply(to scrollView: NSScrollView) {
         scrollView.scrollerStyle = .overlay
         scrollView.autohidesScrollers = true
@@ -102,7 +116,7 @@ final class ClipFlowOverlayScroller: NSScroller {
         scrollerStyle: NSScroller.Style
     ) -> CGFloat {
         scrollerStyle == .overlay
-            ? 7
+            ? 5
             : super.scrollerWidth(
                 for: controlSize,
                 scrollerStyle: scrollerStyle
@@ -185,8 +199,8 @@ private struct ClipFlowScrollProbe: NSViewRepresentable {
 
         func scheduleConfiguration() {
             DispatchQueue.main.async { [weak self] in
-                guard let scrollView = self?.enclosingScrollView else { return }
-                ClipFlowScrollAppearance.apply(to: scrollView)
+                guard let contentView = self?.window?.contentView else { return }
+                ClipFlowScrollAppearance.apply(to: contentView)
             }
         }
     }

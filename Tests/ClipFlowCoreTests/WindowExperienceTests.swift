@@ -52,9 +52,9 @@ struct WindowExperienceTests {
         #expect(ClipFlowVisualStyle.primaryActionHeight == 42)
         #expect(ClipFlowVisualStyle.secondaryActionHeight == 36)
         #expect(ClipFlowVisualStyle.utilityActionHeight == 30)
-        #expect(ClipFlowVisualStyle.scrollIndicatorThickness == 4)
-        #expect(ClipFlowVisualStyle.scrollIndicatorOpacity == 0.20)
-        #expect(ClipFlowVisualStyle.scrollIndicatorHoverOpacity == 0.34)
+        #expect(ClipFlowVisualStyle.scrollIndicatorThickness == 3)
+        #expect(ClipFlowVisualStyle.scrollIndicatorOpacity == 0.12)
+        #expect(ClipFlowVisualStyle.scrollIndicatorHoverOpacity == 0.24)
 
         let scrollView = NSScrollView()
         scrollView.hasVerticalScroller = true
@@ -69,8 +69,28 @@ struct WindowExperienceTests {
             ClipFlowOverlayScroller.scrollerWidth(
                 for: .mini,
                 scrollerStyle: .overlay
-            ) == 7
+            ) == 5
         )
+    }
+
+    @Test("scroll appearance discovers every SwiftUI scroll container in a window")
+    func scrollViewDiscovery() {
+        let root = NSView()
+        let wrapper = NSView()
+        let first = NSScrollView()
+        let nestedWrapper = NSView()
+        let second = NSScrollView()
+
+        root.addSubview(wrapper)
+        wrapper.addSubview(first)
+        wrapper.addSubview(nestedWrapper)
+        nestedWrapper.addSubview(second)
+
+        let discovered = ClipFlowScrollAppearance.scrollViews(in: root)
+
+        #expect(discovered.count == 2)
+        #expect(discovered.contains { $0 === first })
+        #expect(discovered.contains { $0 === second })
     }
 
     @Test("settings window keeps native titlebar controls unobstructed")
@@ -128,20 +148,20 @@ struct WindowExperienceTests {
         )
     }
 
-    @Test("overlay scroll indicators stay four points thick in both orientations")
+    @Test("overlay scroll indicators stay three points thick in both orientations")
     func overlayScrollIndicatorGeometry() {
         let verticalKnob = CGRect(x: 0, y: 8, width: 12, height: 72)
         let verticalIndicator = ClipFlowScrollAppearance.indicatorRect(
             in: verticalKnob
         )
-        #expect(verticalIndicator.width == 4)
+        #expect(verticalIndicator.width == 3)
         #expect(verticalIndicator.midX == verticalKnob.midX)
 
         let horizontalKnob = CGRect(x: 8, y: 0, width: 72, height: 12)
         let horizontalIndicator = ClipFlowScrollAppearance.indicatorRect(
             in: horizontalKnob
         )
-        #expect(horizontalIndicator.height == 4)
+        #expect(horizontalIndicator.height == 3)
         #expect(horizontalIndicator.midY == horizontalKnob.midY)
     }
 }
