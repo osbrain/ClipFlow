@@ -19,7 +19,12 @@ public struct OnboardingView: View {
     public var body: some View {
         HStack(spacing: 0) {
             hero
-                .frame(width: OnboardingLayout.heroWidth)
+                .frame(width: OnboardingLayout.heroBackgroundMinimumSize.width)
+                .frame(
+                    minHeight: OnboardingLayout.heroBackgroundMinimumSize.height,
+                    maxHeight: .infinity
+                )
+                .background { heroBackground }
 
             Divider()
 
@@ -84,16 +89,17 @@ public struct OnboardingView: View {
         }
         .padding(.horizontal, 24)
         .padding(.vertical, 28)
-        .background {
-            LinearGradient(
-                colors: [
-                    Color.accentColor.opacity(0.15),
-                    Color.accentColor.opacity(0.045)
-                ],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-        }
+    }
+
+    private var heroBackground: some View {
+        LinearGradient(
+            colors: [
+                Color.accentColor.opacity(0.15),
+                Color.accentColor.opacity(0.045)
+            ],
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
+        )
     }
 
     private var setup: some View {

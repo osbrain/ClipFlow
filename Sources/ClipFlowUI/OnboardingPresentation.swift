@@ -3,6 +3,10 @@ import CoreGraphics
 public enum OnboardingLayout {
     public static let minimumSize = CGSize(width: 800, height: 520)
     public static let heroWidth: CGFloat = 250
+    public static let heroBackgroundMinimumSize = CGSize(
+        width: heroWidth,
+        height: minimumSize.height
+    )
     public static let setupMaximumWidth: CGFloat = 830
 }
 

@@ -8,7 +8,29 @@ struct OnboardingPresentationTests {
     func compactPanelMetrics() {
         #expect(OnboardingLayout.minimumSize == CGSize(width: 800, height: 520))
         #expect(OnboardingLayout.heroWidth == 250)
+        #expect(
+            OnboardingLayout.heroBackgroundMinimumSize ==
+                CGSize(width: 250, height: 520)
+        )
         #expect(OnboardingLayout.setupMaximumWidth == 830)
+    }
+
+    @Test("onboarding copy follows the selected system language")
+    func onboardingSystemLanguage() {
+        #expect(
+            L10n.string(
+                "onboarding.welcome",
+                language: .system,
+                preferredLanguages: ["zh-Hans-CN", "en-US"]
+            ) == "欢迎使用拾笺"
+        )
+        #expect(
+            L10n.string(
+                "onboarding.welcome",
+                language: .system,
+                preferredLanguages: ["en-US", "zh-Hans-CN"]
+            ) == "Welcome to ClipFlow"
+        )
     }
 
     @Test("pending permission keeps onboarding optional and actionable")
