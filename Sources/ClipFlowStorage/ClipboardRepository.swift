@@ -190,10 +190,43 @@ public final class ClipboardRepository: @unchecked Sendable {
         ).first.flatMap(Self.decodeItem)
     }
 
-    public func search(_ query: SearchQuery) throws -> [ClipboardItem] {
-        let items = try database.query(
-            Self.itemSelect + " ORDER BY COALESCE(last_used_at, updated_at) DESC, updated_at DESC;"
-        ).compactMap(Self.decodeItem)
+    public func search(
+        _ query: SearchQuery,
+        limit: Int = .max
+    ) throws -> [ClipboardItem] {
+        let requestedLimit = max(1, limit)
+        var conditions: [String] = []
+        var bindings: [SQLValue] = []
+        if query.favoritesOnly {
+            conditions.append("is_favorite = 1")
+        }
+        if let kind = query.kind {
+            conditions.append("kind = ?")
+            bindings.append(.text(kind.rawValue))
+        }
+        if let categoryID = query.categoryID {
+            conditions.append(
+                "EXISTS(SELECT 1 FROM item_categories filter_categories "
+                    + "WHERE filter_categories.item_id = clipboard_items.id "
+                    + "AND filter_categories.category_id = ?)"
+            )
+            bindings.append(.text(categoryID.uuidString))
+        }
+
+        var sql = Self.itemSelect
+        if !conditions.isEmpty {
+            sql += " WHERE " + conditions.joined(separator: " AND ")
+        }
+        sql += " ORDER BY COALESCE(last_used_at, updated_at) DESC, updated_at DESC"
+        if query.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+           requestedLimit != .max {
+            sql += " LIMIT ?"
+            bindings.append(.integer(Int64(requestedLimit)))
+        }
+        sql += ";"
+
+        let items = try database.query(sql, bindings: bindings).compactMap(Self.decodeItem)
+        let categoryIDsByItemID = try categoryIDsByItemID()
 
         var ranked: [(score: Int, item: ClipboardItem)] = []
         for item in items {
@@ -203,7 +236,7 @@ public final class ClipboardRepository: @unchecked Sendable {
                 body: item.searchText,
                 appName: item.appName,
                 isFavorite: item.isFavorite,
-                categoryIDs: Set(try categories(for: item.id).map(\.id)),
+                categoryIDs: categoryIDsByItemID[item.id, default: []],
                 kind: item.kind
             )
             if let score = query.score(document) {
@@ -214,7 +247,7 @@ public final class ClipboardRepository: @unchecked Sendable {
         return ranked.sorted {
             if $0.score != $1.score { return $0.score < $1.score }
             return $0.item.updatedAt > $1.item.updatedAt
-        }.map(\.item)
+        }.prefix(requestedLimit).map(\.item)
     }
 
     public func payloads(for itemID: UUID) throws -> [RepositoryPayload] {
@@ -397,6 +430,21 @@ public final class ClipboardRepository: @unchecked Sendable {
                 sortOrder: Int(row.integer("sort_order") ?? 0)
             )
         }
+    }
+
+    private func categoryIDsByItemID() throws -> [UUID: Set<UUID>] {
+        let rows = try database.query(
+            "SELECT item_id, category_id FROM item_categories;"
+        )
+        var result: [UUID: Set<UUID>] = [:]
+        for row in rows {
+            guard let itemID = row.uuid("item_id"),
+                  let categoryID = row.uuid("category_id") else {
+                continue
+            }
+            result[itemID, default: []].insert(categoryID)
+        }
+        return result
     }
 
     @discardableResult

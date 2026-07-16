@@ -56,6 +56,7 @@ struct AppModelTests {
         #expect(repository.lastQuery?.categoryID == categoryID)
         #expect(repository.lastQuery?.kind == .image)
         #expect(repository.lastQuery?.favoritesOnly == true)
+        #expect(repository.lastLimit == 500)
     }
 
     @Test("applying a history filter clears mutually exclusive repository values")
@@ -361,6 +362,7 @@ private final class FakeHistoryRepository: HistoryRepository, @unchecked Sendabl
     private var items: [ClipboardItem]
     private var used: [UUID] = []
     private var query: SearchQuery?
+    private var limit: Int?
     private var favorites: [(UUID, Bool)] = []
     private var renames: [(UUID, String?)] = []
     private var deletions: [UUID] = []
@@ -372,6 +374,7 @@ private final class FakeHistoryRepository: HistoryRepository, @unchecked Sendabl
 
     var markedUsed: [UUID] { lock.withLock { used } }
     var lastQuery: SearchQuery? { lock.withLock { query } }
+    var lastLimit: Int? { lock.withLock { limit } }
     var favoriteChanges: [(UUID, Bool)] { lock.withLock { favorites } }
     var renameChanges: [(UUID, String?)] { lock.withLock { renames } }
     var deletedIDs: [UUID] { lock.withLock { deletions } }
@@ -382,15 +385,18 @@ private final class FakeHistoryRepository: HistoryRepository, @unchecked Sendabl
         lock.withLock { self.items = items }
     }
 
-    func search(_ query: SearchQuery) throws -> [ClipboardItem] {
-        lock.withLock { self.query = query }
+    func search(_ query: SearchQuery, limit: Int) throws -> [ClipboardItem] {
+        lock.withLock {
+            self.query = query
+            self.limit = limit
+        }
         return lock.withLock {
             items.filter {
                 query.score(ItemSearchDocument(
                     id: $0.id, title: $0.displayTitle, body: $0.searchText,
                     appName: $0.appName, isFavorite: $0.isFavorite, kind: $0.kind
                 )) != nil
-            }
+            }.prefix(limit).map { $0 }
         }
     }
 

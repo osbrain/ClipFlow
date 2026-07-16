@@ -5,7 +5,7 @@ import Foundation
 import Observation
 
 public protocol HistoryRepository: Sendable {
-    func search(_ query: SearchQuery) throws -> [ClipboardItem]
+    func search(_ query: SearchQuery, limit: Int) throws -> [ClipboardItem]
     func markUsed(_ id: UUID) throws
     func setFavorite(_ favorite: Bool, for id: UUID) throws
     func rename(_ id: UUID, title: String?) throws
@@ -163,7 +163,7 @@ public final class AppModel {
                 kind: selectedKind,
                 favoritesOnly: favoritesOnly
             )
-            let results = try repository.search(query)
+            let results = try repository.search(query, limit: 500)
             categories = try repository.allCategories()
             let previousItems = Dictionary(uniqueKeysWithValues: items.map { ($0.id, $0) })
             let previousVisuals = visuals

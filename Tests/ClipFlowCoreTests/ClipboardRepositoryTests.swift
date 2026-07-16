@@ -211,16 +211,63 @@ struct ClipboardRepositoryTests {
         #expect(try harness.repository.item(id: newest.item.id) != nil)
         #expect(try harness.externalPayloadFileCount() == 2)
     }
+
+    @Test("bounded search returns only the newest requested items")
+    func boundedSearchReturnsNewestItems() throws {
+        let harness = try RepositoryHarness()
+        defer { harness.cleanup() }
+        let base = Date(timeIntervalSince1970: 1_700_000_000)
+        for index in 0..<600 {
+            _ = try harness.repository.upsert(
+                harness.capture(hash: "bounded-\(index)", preview: "Item \(index)"),
+                timestamp: base.addingTimeInterval(TimeInterval(index))
+            )
+        }
+
+        let results = try harness.repository.search(
+            SearchQuery(text: "", categoryID: nil, kind: nil, favoritesOnly: false),
+            limit: 200
+        )
+
+        #expect(results.count == 200)
+        #expect(results.first?.previewText == "Item 599")
+        #expect(results.last?.previewText == "Item 400")
+    }
+
+    @Test("search loads category memberships with one bulk query")
+    func searchLoadsCategoriesInBulk() throws {
+        let harness = try RepositoryHarness()
+        defer { harness.cleanup() }
+        for index in 0..<120 {
+            _ = try harness.repository.upsert(
+                harness.capture(hash: "category-\(index)", preview: "Item \(index)")
+            )
+        }
+        let queryCounter = LockedCounter()
+        harness.database.setQueryObserver { sql in
+            if sql.contains("item_categories") {
+                queryCounter.increment()
+            }
+        }
+
+        _ = try harness.repository.search(
+            SearchQuery(text: "", categoryID: nil, kind: nil, favoritesOnly: false),
+            limit: 100
+        )
+
+        #expect(queryCounter.value == 1)
+    }
 }
 
 private final class RepositoryHarness {
     let root: URL
+    let database: SQLCipherDatabase
     let repository: ClipboardRepository
 
     init(externalThresholdBytes: Int = 1_000) throws {
         root = FileManager.default.temporaryDirectory
             .appendingPathComponent(UUID().uuidString, isDirectory: true)
-        let database = try SQLCipherDatabase(
+        database = try SQLCipherDatabase(
             url: root.appendingPathComponent("ClipFlow.sqlite"),
             key: Data(repeating: 0x44, count: 32)
         )
@@ -299,5 +346,16 @@ private final class RepositoryHarness {
 
     func cleanup() {
         try? FileManager.default.removeItem(at: root)
+    }
+}
+
+private final class LockedCounter: @unchecked Sendable {
+    private let lock = NSLock()
+    private var count = 0
+
+    var value: Int { lock.withLock { count } }
+
+    func increment() {
+        lock.withLock { count += 1 }
     }
 }
