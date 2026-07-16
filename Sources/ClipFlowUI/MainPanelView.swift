@@ -932,7 +932,7 @@ private struct HistoryCardRow: View {
                     Text("·").foregroundStyle(.tertiary)
                     Label(item.kind.localizedDisplayName, systemImage: item.kind.presentation.symbolName)
                     Text("·").foregroundStyle(.tertiary)
-                    Text(item.updatedAt, style: .relative)
+                    Text(HistoryTimePresentation.text(for: item.updatedAt))
                     Text("·").foregroundStyle(.tertiary)
                     Text(L10n.formattedByteCount(item.byteSize))
                 }
@@ -946,7 +946,11 @@ private struct HistoryCardRow: View {
         .frame(minHeight: rowHeight)
         .background {
             RoundedRectangle(cornerRadius: ClipFlowVisualStyle.cardRadius)
-                .fill(isSelected ? AnyShapeStyle(.thinMaterial) : AnyShapeStyle(Color.primary.opacity(isHovering ? 0.07 : 0.035)))
+                .fill(
+                    isSelected
+                        ? ClipFlowVisualStyle.selectedRowFillColor
+                        : Color.primary.opacity(isHovering ? 0.07 : 0.035)
+                )
         }
         .overlay {
             RoundedRectangle(cornerRadius: ClipFlowVisualStyle.cardRadius)

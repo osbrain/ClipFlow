@@ -25,7 +25,10 @@ struct GlassSection<Content: View>: View {
             content
         }
         .padding(16)
-        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 14))
+        .background(
+            ClipFlowVisualStyle.cardFillColor,
+            in: RoundedRectangle(cornerRadius: 14)
+        )
         .overlay {
             RoundedRectangle(cornerRadius: 14)
                 .stroke(ClipFlowVisualStyle.hairlineColor)
@@ -74,7 +77,10 @@ struct GlassRow<Content: View>: View {
             content
         }
         .padding(12)
-        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: ClipFlowVisualStyle.cardRadius))
+        .background(
+            ClipFlowVisualStyle.cardFillColor,
+            in: RoundedRectangle(cornerRadius: ClipFlowVisualStyle.cardRadius)
+        )
         .overlay {
             RoundedRectangle(cornerRadius: ClipFlowVisualStyle.cardRadius)
                 .stroke(ClipFlowVisualStyle.hairlineColor)
@@ -223,7 +229,10 @@ struct MetadataCard: View {
         .accessibilityElement(children: .combine)
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(12)
-        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: ClipFlowVisualStyle.cardRadius))
+        .background(
+            ClipFlowVisualStyle.cardFillColor,
+            in: RoundedRectangle(cornerRadius: ClipFlowVisualStyle.cardRadius)
+        )
         .overlay {
             RoundedRectangle(cornerRadius: ClipFlowVisualStyle.cardRadius)
                 .stroke(ClipFlowVisualStyle.hairlineColor)

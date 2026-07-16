@@ -192,3 +192,7 @@
 "settings.logPath" = "Local Log";
 "settings.logNotCreated" = "Log file has not been created yet";
 "settings.revealLog" = "Show in Finder";
+"history.time.justNow" = "Just now";
+"history.time.minutesAgo" = "%d min ago";
+"history.time.today" = "Today";
+"history.time.yesterday" = "Yesterday";

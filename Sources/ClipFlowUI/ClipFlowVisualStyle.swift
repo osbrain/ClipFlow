@@ -34,4 +34,6 @@ enum ClipFlowVisualStyle {
     static let scrollIndicatorHoverOpacity: CGFloat = 0.24
     static let hairlineColor = Color(nsColor: .separatorColor)
     static let hoverFillColor = Color.primary.opacity(0.08)
+    static let cardFillColor = Color(nsColor: .controlBackgroundColor).opacity(0.72)
+    static let selectedRowFillColor = Color.accentColor.opacity(0.14)
 }

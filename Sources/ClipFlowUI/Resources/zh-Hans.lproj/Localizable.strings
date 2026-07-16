@@ -192,3 +192,7 @@
 "settings.logPath" = "本地日志";
 "settings.logNotCreated" = "日志文件尚未创建";
 "settings.revealLog" = "在访达中显示";
+"history.time.justNow" = "刚刚";
+"history.time.minutesAgo" = "%d 分钟前";
+"history.time.today" = "今天";
+"history.time.yesterday" = "昨天";
