@@ -337,14 +337,63 @@ struct AppModelTests {
         #expect(thumbnail.size.width == 29)
     }
 
+    @Test("duplicate capture refreshes and reorders without repository reload")
+    func duplicateCaptureRefreshesIncrementally() async {
+        let base = Date(timeIntervalSince1970: 1_700_000_000)
+        let duplicateID = UUID()
+        let other = Self.item(preview: "Other", updatedAt: base.addingTimeInterval(60))
+        let duplicate = Self.item(
+            id: duplicateID,
+            preview: "Duplicate",
+            updatedAt: base
+        )
+        let repository = FakeHistoryRepository(items: [other, duplicate])
+        let visualService = FakeClipboardVisualService()
+        let model = AppModel(
+            repository: repository,
+            pasteService: FakePasteService(),
+            visualService: visualService
+        )
+        await model.reload()
+        let refreshed = Self.item(
+            id: duplicateID,
+            preview: "Duplicate",
+            updatedAt: base.addingTimeInterval(120),
+            appName: "Safari",
+            bundleID: "com.apple.Safari"
+        )
+
+        let refreshedInPlace = model.refreshCapturedItem(refreshed)
+
+        #expect(refreshedInPlace)
+        #expect(model.items.map(\.id) == [duplicateID, other.id])
+        #expect(model.items.first?.appName == "Safari")
+        #expect(repository.searchCount == 1)
+    }
+
+    @Test("filtered history declines an incremental capture refresh")
+    func filteredHistoryDeclinesIncrementalRefresh() async {
+        let item = Self.item(preview: "Filtered")
+        let repository = FakeHistoryRepository(items: [item])
+        let model = AppModel(repository: repository, pasteService: FakePasteService())
+        model.searchText = "Filtered"
+        await model.reload()
+
+        #expect(!model.refreshCapturedItem(item))
+        #expect(repository.searchCount == 1)
+    }
+
     private static func item(
         id: UUID = UUID(),
         preview: String,
-        kind: ClipboardKind = .text
+        kind: ClipboardKind = .text,
+        updatedAt: Date = .distantPast,
+        appName: String = "Notes",
+        bundleID: String? = "com.apple.Notes"
     ) -> ClipboardItem {
         ClipboardItem(
-            id: id, createdAt: .distantPast, updatedAt: .distantPast,
-            appName: "Notes", bundleID: "com.apple.Notes", kind: kind,
+            id: id, createdAt: .distantPast, updatedAt: updatedAt,
+            appName: appName, bundleID: bundleID, kind: kind,
             previewText: preview, searchText: preview.lowercased(),
             byteSize: preview.utf8.count, contentHash: preview,
             isFavorite: false, lastUsedAt: nil, customTitle: nil,
@@ -363,6 +412,7 @@ private final class FakeHistoryRepository: HistoryRepository, @unchecked Sendabl
     private var used: [UUID] = []
     private var query: SearchQuery?
     private var limit: Int?
+    private var searches = 0
     private var favorites: [(UUID, Bool)] = []
     private var renames: [(UUID, String?)] = []
     private var deletions: [UUID] = []
@@ -375,6 +425,7 @@ private final class FakeHistoryRepository: HistoryRepository, @unchecked Sendabl
     var markedUsed: [UUID] { lock.withLock { used } }
     var lastQuery: SearchQuery? { lock.withLock { query } }
     var lastLimit: Int? { lock.withLock { limit } }
+    var searchCount: Int { lock.withLock { searches } }
     var favoriteChanges: [(UUID, Bool)] { lock.withLock { favorites } }
     var renameChanges: [(UUID, String?)] { lock.withLock { renames } }
     var deletedIDs: [UUID] { lock.withLock { deletions } }
@@ -389,6 +440,7 @@ private final class FakeHistoryRepository: HistoryRepository, @unchecked Sendabl
         lock.withLock {
             self.query = query
             self.limit = limit
+            searches += 1
         }
         return lock.withLock {
             items.filter {

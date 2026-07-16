@@ -28,12 +28,29 @@ struct PasteboardMonitorTests {
         #expect(await recorder.count == 1)
         #expect(await recorder.lastText == "first")
     }
+
+    @Test("idle polls never read a clipboard snapshot")
+    func idlePollsDoNotReadSnapshots() async {
+        let board = FakePasteboard(changeCount: 1)
+        let recorder = CaptureRecorder()
+        let monitor = PasteboardMonitor(pasteboard: board)
+
+        for _ in 0..<100 {
+            await monitor.pollOnce { capture in
+                await recorder.append(capture)
+            }
+        }
+
+        #expect(board.snapshotCount == 0)
+        #expect(await recorder.count == 0)
+    }
 }
 
 private final class FakePasteboard: PasteboardAccess, @unchecked Sendable {
     private let lock = NSLock()
     private var storedChangeCount: Int
     private var text = ""
+    private var snapshots = 0
 
     init(changeCount: Int) {
         storedChangeCount = changeCount
@@ -45,7 +62,8 @@ private final class FakePasteboard: PasteboardAccess, @unchecked Sendable {
 
     func snapshot() -> RawClipboardCapture? {
         lock.withLock {
-            RawClipboardCapture(
+            snapshots += 1
+            return RawClipboardCapture(
                 sourceAppName: "Test",
                 sourceBundleID: "local.clipflow.tests",
                 items: [
@@ -58,6 +76,10 @@ private final class FakePasteboard: PasteboardAccess, @unchecked Sendable {
                 ]
             )
         }
+    }
+
+    var snapshotCount: Int {
+        lock.withLock { snapshots }
     }
 
     func setText(_ value: String, changeCount: Int) {

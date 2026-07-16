@@ -30,6 +30,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var settingsModel: SettingsModel?
     private var appModel: AppModel?
     private var historyRepository: (any HistoryRepository)?
+    private var captureProcessor: ClipboardCaptureProcessor?
     private var isRestoringRuntimeSettings = false
     private let loginItemService = LoginItemService()
 
@@ -225,40 +226,28 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             }
 
             let pasteboardMonitor: PasteboardMonitor?
+            let captureProcessor: ClipboardCaptureProcessor?
             if visualAcceptanceConfiguration == nil {
+                let processor = ClipboardCaptureProcessor(
+                    normalizer: clipboardNormalizer,
+                    repository: repository,
+                    model: model,
+                    retentionPolicy: { retentionPolicyStore.current() },
+                    log: { event, metadata in
+                        await logger.log(event, metadata: metadata)
+                    }
+                )
                 let monitor = PasteboardMonitor(pasteboard: clipboard)
                 Task {
                     await monitor.start { capture in
-                        do {
-                            let normalized = try clipboardNormalizer.normalize(capture)
-                            _ = try repository.upsert(normalized)
-                            let deleted = try repository.applyRetention(
-                                retentionPolicyStore.current()
-                            )
-                            await logger.log(
-                                "capture",
-                                metadata: [
-                                    "kind": normalized.kind.rawValue,
-                                    "byteCount": "\(normalized.byteSize)"
-                                ]
-                            )
-                            if !deleted.isEmpty {
-                                await logger.log(
-                                    "retention_cleanup",
-                                    metadata: ["deletedCount": "\(deleted.count)"]
-                                )
-                            }
-                            await model.reload()
-                        } catch ClipboardNormalizationError.noUsablePayload {
-                            return
-                        } catch {
-                            return
-                        }
+                        _ = await processor.process(capture)
                     }
                 }
                 pasteboardMonitor = monitor
+                captureProcessor = processor
             } else {
                 pasteboardMonitor = nil
+                captureProcessor = nil
             }
 
             self.panelController = panelController
@@ -268,6 +257,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             self.settingsModel = settings
             self.appModel = model
             self.historyRepository = repository
+            self.captureProcessor = captureProcessor
             self.logger = logger
             self.settingsCoordinator = AppSettingsCoordinator(
                 repository: repository,
@@ -462,7 +452,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private func rebuildStatusMenu(_ menu: NSMenu) {
         menu.removeAllItems()
         let records = (try? historyRepository?.search(
-            SearchQuery(text: "", categoryID: nil, kind: nil, favoritesOnly: false)
+            SearchQuery(text: "", categoryID: nil, kind: nil, favoritesOnly: false),
+            limit: 3
         )) ?? []
         let presentation = StatusMenuPresentation(
             items: records,

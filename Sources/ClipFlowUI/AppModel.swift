@@ -209,6 +209,35 @@ public final class AppModel {
         }
     }
 
+    @discardableResult
+    public func refreshCapturedItem(_ refreshedItem: ClipboardItem) -> Bool {
+        guard searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+              selectedCategoryID == nil,
+              selectedKind == nil,
+              !favoritesOnly,
+              let index = items.firstIndex(where: { $0.id == refreshedItem.id }),
+              items[index].contentHash == refreshedItem.contentHash else {
+            return false
+        }
+
+        items[index] = refreshedItem
+        items.sort { lhs, rhs in
+            let lhsOrder = lhs.lastUsedAt ?? lhs.updatedAt
+            let rhsOrder = rhs.lastUsedAt ?? rhs.updatedAt
+            if lhsOrder != rhsOrder { return lhsOrder > rhsOrder }
+            return lhs.updatedAt > rhs.updatedAt
+        }
+
+        if let visualService {
+            var descriptor = visualService.metadataVisual(for: refreshedItem)
+            if let thumbnail = visuals[refreshedItem.id]?.thumbnail {
+                descriptor = descriptor.replacingThumbnail(thumbnail)
+            }
+            visuals[refreshedItem.id] = descriptor
+        }
+        return true
+    }
+
     public func requestThumbnail(for item: ClipboardItem, maximumPixelSize: Int) {
         guard maximumPixelSize > 0,
               let visualService,
