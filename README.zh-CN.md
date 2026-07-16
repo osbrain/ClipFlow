@@ -7,22 +7,28 @@
 ## 主要功能
 
 - 捕获和还原文本、富文本、链接、文件、图片、PDF 及其他受支持的剪贴板表示形式。
-- 搜索剪贴板历史，并按内容类型、收藏与自定义分类浏览。
-- 使用 `Command` + `Shift` + `V` 打开悬浮面板，粘贴、收藏、重命名、分类、预览或删除条目。
+- 搜索剪贴板历史，并按内容类型、收藏、链接、文件、图片、浏览器标签页与自定义分类浏览。
+- 使用 `Command` + `Shift` + `V` 打开悬浮面板，粘贴、收藏、重命名、分类、预览或删除条目，键盘操作也保持顺手。
+- 针对不同类型展示专属操作，例如粘贴文件、粘贴文件路径、在 Finder 中显示、打开链接、复制域名和完整预览。
 - 支持保留原始格式或纯文本粘贴。
 - 可选集成 Safari、Google Chrome 和 Microsoft Edge 的浏览器标签页浏览与激活功能。
 - 使用 SQLCipher 加密剪贴板元数据，并单独加密较大的本地负载文件。
+- 对重复复制做语义去重，并通过限制加载数量与静态时间标签降低历史列表滚动开销。
 - 完全在你的 Mac 本机运行：没有账户、广告、分析、遥测或云端剪贴板处理。
 
 ## 界面预览
 
-| 剪贴板历史 | 类型专属操作 |
+| 剪贴板历史 | 文件专属操作 |
 | --- | --- |
-| ![拾笺深色简体中文主控面板](docs/images/main-panel-dark-zh.png) | ![拾笺图片条目的专属粘贴与预览操作](docs/images/image-actions-light-en.png) |
+| ![拾笺深色简体中文主控面板](docs/images/main-panel-dark-zh.png) | ![拾笺文件条目的粘贴、路径、打开和 Finder 操作](docs/images/file-actions-light-en.png) |
 
-| 设置 | 浏览器标签页 |
+| 设置 | 首次引导 |
 | --- | --- |
-| ![拾笺的快捷键、外观、语言、保留策略和存储设置](docs/images/settings-light-en.png) | ![拾笺的浏览器标签页空状态与受支持浏览器状态](docs/images/browser-tabs-light-en.png) |
+| ![拾笺的快捷键、外观、语言、保留策略和存储设置](docs/images/settings-dark-zh.png) | ![拾笺首次安装权限引导](docs/images/onboarding-light-zh.png) |
+
+| 图片预览 | 浏览器标签页 |
+| --- | --- |
+| ![拾笺图片条目的专属粘贴与预览操作](docs/images/image-actions-light-en.png) | ![拾笺的浏览器标签页空状态与受支持浏览器状态](docs/images/browser-tabs-light-en.png) |
 
 ## 隐私与权限
 
@@ -32,11 +38,24 @@
 - **自动化**：仅在启用浏览器标签页集成时需要；浏览器控制始终在本机执行。
 - **登录时启动**：可选。
 
+当前测试包采用 Ad-hoc 签名，尚未 notarize。发给朋友体验时，首次打开可能需要在 **系统设置 -> 隐私与安全性** 中选择 **仍要打开**。自动粘贴还需要在 **系统设置 -> 隐私与安全性 -> 辅助功能** 中启用拾笺。
+
 ## 环境要求
 
 - macOS 14 Sonoma 或更高版本
 - Swift 6.2 工具链
 - Homebrew（仅在初始化本地 SQLCipher 开发库时需要）
+
+## 下载测试包
+
+在 GitHub Releases 中分发给朋友时，优先使用 DMG：
+
+1. 下载 `ClipFlow-<version>-macos.dmg`。
+2. 打开 DMG，将 `ClipFlow.app` 拖到 `Applications`。
+3. 从“应用程序”中启动拾笺。
+4. 如果 macOS 阻止打开，到 **系统设置 -> 隐私与安全性** 中选择 **仍要打开**。
+
+ZIP 包包含同一个 app bundle，更适合直接解压或归档测试。
 
 ## 从源码构建
 
@@ -60,7 +79,10 @@ open artifacts/ClipFlow.app
 
 ```bash
 ./scripts/package-app.sh release
+./scripts/package-dmg.sh
 ```
+
+打包产物会输出到 `artifacts/`。
 
 ## 贡献
 
