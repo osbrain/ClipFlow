@@ -435,9 +435,12 @@ private struct ClipFlowHeader: View {
             Button(action: showSettings) {
                 Image(systemName: "gearshape")
                     .font(.system(size: 15, weight: .semibold))
-                    .frame(width: 30, height: 30)
+                    .frame(
+                        width: HeaderControlLayout.height,
+                        height: HeaderControlLayout.height
+                    )
             }
-            .buttonStyle(.bordered)
+            .buttonStyle(HeaderToolButtonStyle())
             .accessibilityLabel(L10n.string("settings.title"))
             .help(L10n.string("settings.title"))
         }
@@ -502,12 +505,32 @@ private struct HeaderSourceContext: View {
             }
         }
         .padding(.horizontal, 11)
-        .padding(.vertical, 7)
-        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 10))
-        .overlay {
-            RoundedRectangle(cornerRadius: 10).stroke(ClipFlowVisualStyle.hairlineColor)
-        }
+        .frame(height: HeaderControlLayout.height)
+        .background(
+            Color.primary.opacity(HeaderControlLayout.fillOpacity),
+            in: RoundedRectangle(cornerRadius: HeaderControlLayout.cornerRadius)
+        )
         .accessibilityElement(children: .combine)
+    }
+}
+
+private struct HeaderToolButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .foregroundStyle(.primary)
+            .background(
+                Color.primary.opacity(
+                    configuration.isPressed
+                        ? HeaderControlLayout.fillOpacity * 1.8
+                        : HeaderControlLayout.fillOpacity
+                ),
+                in: RoundedRectangle(cornerRadius: HeaderControlLayout.cornerRadius)
+            )
+            .contentShape(
+                RoundedRectangle(cornerRadius: HeaderControlLayout.cornerRadius)
+            )
+            .scaleEffect(configuration.isPressed ? 0.97 : 1)
+            .animation(.easeOut(duration: 0.12), value: configuration.isPressed)
     }
 }
 

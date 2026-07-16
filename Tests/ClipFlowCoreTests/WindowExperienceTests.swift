@@ -14,6 +14,12 @@ struct WindowExperienceTests {
         #expect(MainPanelLayout.clampedWidth(1_800) == 1_080)
     }
 
+    @Test("header utility controls share one visual height")
+    func headerUtilityControlMetrics() {
+        #expect(HeaderControlLayout.height == 42)
+        #expect(HeaderControlLayout.cornerRadius == 10)
+    }
+
     @Test("main panel hides on focus loss unless a sheet is active")
     func panelDismissalPolicy() {
         #expect(PanelDismissalPolicy.shouldHideOnResign(isPresentingSheet: false))

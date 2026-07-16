@@ -11,6 +11,12 @@ public enum MainPanelLayout {
     }
 }
 
+public enum HeaderControlLayout {
+    public static let height: CGFloat = 42
+    public static let cornerRadius: CGFloat = 10
+    static let fillOpacity = 0.06
+}
+
 enum ClipFlowVisualStyle {
     static let windowRadius: CGFloat = 18
     static let cardRadius: CGFloat = 12
