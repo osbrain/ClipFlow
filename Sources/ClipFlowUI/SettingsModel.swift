@@ -54,6 +54,20 @@ public enum RetentionPreference: String, CaseIterable, Sendable {
     case unlimited
 }
 
+public enum MainPanelOpacity {
+    public static let minimumPercent = 60
+    public static let maximumPercent = 100
+    public static let defaultPercent = 100
+
+    public static func clampedPercent(_ value: Int) -> Int {
+        min(max(value, minimumPercent), maximumPercent)
+    }
+
+    public static func alphaValue(forPercent percent: Int) -> Double {
+        Double(clampedPercent(percent)) / 100
+    }
+}
+
 @MainActor
 @Observable
 public final class SettingsModel {
@@ -72,6 +86,7 @@ public final class SettingsModel {
     public var doubaoActionEnabled: Bool
     public var debugLoggingEnabled: Bool
     public var defaultPasteMode: String
+    public var mainPanelOpacityPercent: Int
     public var showDetailSource: Bool
     public var showDetailType: Bool
     public var showDetailCreatedAt: Bool
@@ -123,6 +138,10 @@ public final class SettingsModel {
         doubaoActionEnabled = store.bool(forKey: "doubaoActionEnabled")
         debugLoggingEnabled = store.bool(forKey: "debugLoggingEnabled")
         defaultPasteMode = store.string(forKey: "defaultPasteMode") ?? "original"
+        let storedMainPanelOpacity = store.integer(forKey: "mainPanelOpacityPercent")
+        mainPanelOpacityPercent = storedMainPanelOpacity == 0
+            ? MainPanelOpacity.defaultPercent
+            : MainPanelOpacity.clampedPercent(storedMainPanelOpacity)
         showDetailSource = store.containsValue(forKey: "showDetailSource")
             ? store.bool(forKey: "showDetailSource") : true
         showDetailType = store.containsValue(forKey: "showDetailType")
@@ -142,6 +161,7 @@ public final class SettingsModel {
         externalPayloadThresholdMB = max(1, externalPayloadThresholdMB)
         maximumItemCount = max(100, maximumItemCount)
         maximumStorageMB = max(100, maximumStorageMB)
+        mainPanelOpacityPercent = MainPanelOpacity.clampedPercent(mainPanelOpacityPercent)
 
         store.set(shortcut.rawValue, forKey: "showPanelHotKey")
         store.set(appearanceMode.rawValue, forKey: "appearanceMode")
@@ -158,6 +178,7 @@ public final class SettingsModel {
         store.set(doubaoActionEnabled, forKey: "doubaoActionEnabled")
         store.set(debugLoggingEnabled, forKey: "debugLoggingEnabled")
         store.set(defaultPasteMode, forKey: "defaultPasteMode")
+        store.set(mainPanelOpacityPercent, forKey: "mainPanelOpacityPercent")
         store.set(showDetailSource, forKey: "showDetailSource")
         store.set(showDetailType, forKey: "showDetailType")
         store.set(showDetailCreatedAt, forKey: "showDetailCreatedAt")
@@ -210,7 +231,8 @@ public final class SettingsModel {
                 maximumItemCount: maximumItemCount,
                 maximumStorageMB: maximumStorageMB
             ),
-            debugLoggingEnabled: debugLoggingEnabled
+            debugLoggingEnabled: debugLoggingEnabled,
+            mainPanelOpacityPercent: mainPanelOpacityPercent
         )
     }
 }

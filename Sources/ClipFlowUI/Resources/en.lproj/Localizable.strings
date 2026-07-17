@@ -159,6 +159,7 @@
 "settings.showMenuBar" = "Show Menu Bar Item";
 "settings.launchAtLogin" = "Launch at Login";
 "settings.defaultPasteMode" = "Default Paste Mode";
+"settings.mainPanelOpacity" = "Main Panel Opacity";
 "settings.paste.original" = "Original Formatting";
 "settings.paste.plainText" = "Plain Text";
 "settings.appearance" = "Appearance";

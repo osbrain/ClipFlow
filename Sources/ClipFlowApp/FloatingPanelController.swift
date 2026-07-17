@@ -96,6 +96,10 @@ final class FloatingPanelController: NSWindowController, NSWindowDelegate {
         window?.orderOut(nil)
     }
 
+    func setOpacityPercent(_ percent: Int) {
+        window?.alphaValue = CGFloat(MainPanelOpacity.alphaValue(forPercent: percent))
+    }
+
     func windowWillClose(_ notification: Notification) {
         inputState.isPanelVisible = false
         removeEventMonitor()

@@ -159,6 +159,7 @@
 "settings.showMenuBar" = "显示菜单栏图标";
 "settings.launchAtLogin" = "开机自启动";
 "settings.defaultPasteMode" = "默认粘贴方式";
+"settings.mainPanelOpacity" = "主控面板透明度";
 "settings.paste.original" = "保留原格式";
 "settings.paste.plainText" = "纯文本";
 "settings.appearance" = "外观";

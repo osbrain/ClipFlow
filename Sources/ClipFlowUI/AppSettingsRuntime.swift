@@ -34,6 +34,7 @@ public struct AppSettingsRuntimeSnapshot: Equatable, Sendable {
     public let externalPayloadThresholdMB: Int
     public let retention: RetentionSettings
     public let debugLoggingEnabled: Bool
+    public let mainPanelOpacityPercent: Int
 
     public init(
         shortcut: HotKeyShortcut,
@@ -42,7 +43,8 @@ public struct AppSettingsRuntimeSnapshot: Equatable, Sendable {
         defaultPasteMode: PasteMode,
         externalPayloadThresholdMB: Int,
         retention: RetentionSettings,
-        debugLoggingEnabled: Bool
+        debugLoggingEnabled: Bool,
+        mainPanelOpacityPercent: Int = MainPanelOpacity.defaultPercent
     ) {
         self.shortcut = shortcut
         self.showStatusBarItem = showStatusBarItem
@@ -51,6 +53,7 @@ public struct AppSettingsRuntimeSnapshot: Equatable, Sendable {
         self.externalPayloadThresholdMB = max(1, externalPayloadThresholdMB)
         self.retention = retention
         self.debugLoggingEnabled = debugLoggingEnabled
+        self.mainPanelOpacityPercent = MainPanelOpacity.clampedPercent(mainPanelOpacityPercent)
     }
 
     public init(
@@ -61,7 +64,8 @@ public struct AppSettingsRuntimeSnapshot: Equatable, Sendable {
         defaultPasteMode: PasteMode? = nil,
         externalPayloadThresholdMB: Int? = nil,
         retention: RetentionSettings? = nil,
-        debugLoggingEnabled: Bool? = nil
+        debugLoggingEnabled: Bool? = nil,
+        mainPanelOpacityPercent: Int? = nil
     ) {
         self.init(
             shortcut: shortcut ?? snapshot.shortcut,
@@ -71,7 +75,9 @@ public struct AppSettingsRuntimeSnapshot: Equatable, Sendable {
             externalPayloadThresholdMB:
                 externalPayloadThresholdMB ?? snapshot.externalPayloadThresholdMB,
             retention: retention ?? snapshot.retention,
-            debugLoggingEnabled: debugLoggingEnabled ?? snapshot.debugLoggingEnabled
+            debugLoggingEnabled: debugLoggingEnabled ?? snapshot.debugLoggingEnabled,
+            mainPanelOpacityPercent:
+                mainPanelOpacityPercent ?? snapshot.mainPanelOpacityPercent
         )
     }
 
@@ -86,6 +92,9 @@ public struct AppSettingsRuntimeSnapshot: Equatable, Sendable {
         }
         if retention != previous.retention { changes.insert(.retention) }
         if debugLoggingEnabled != previous.debugLoggingEnabled { changes.insert(.debugLogging) }
+        if mainPanelOpacityPercent != previous.mainPanelOpacityPercent {
+            changes.insert(.panelOpacity)
+        }
         return changes
     }
 }
@@ -98,6 +107,7 @@ public enum AppSettingsRuntimeChange: Hashable, Sendable {
     case externalPayloadThreshold
     case retention
     case debugLogging
+    case panelOpacity
 }
 
 public extension RetentionPreference {

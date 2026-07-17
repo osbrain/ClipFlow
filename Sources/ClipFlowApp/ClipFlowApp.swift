@@ -208,6 +208,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                     )
                 }
             )
+            panelController.setOpacityPercent(settings.mainPanelOpacityPercent)
             let hotKeyController: GlobalHotKeyController?
             if visualAcceptanceConfiguration == nil {
                 let controller = GlobalHotKeyController()
@@ -272,6 +273,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 },
                 updateLanguage: { [weak self] language in
                     self?.updateLanguage(language)
+                },
+                updatePanelOpacity: { [weak panelController] percent in
+                    panelController?.setOpacityPercent(percent)
                 }
             )
             updateStatusItem(enabled: settings.showStatusBarItem)

@@ -227,6 +227,8 @@ public struct SettingsView: View {
                     }
                 }
 
+                mainPanelOpacityRow
+
                 menuRow(
                     icon: "doc.on.clipboard",
                     title: L10n.string("settings.defaultPasteMode"),
@@ -237,6 +239,26 @@ public struct SettingsView: View {
                     Text(L10n.string("settings.paste.plainText")).tag("plainText")
                 }
             }
+        }
+    }
+
+    private var mainPanelOpacityRow: some View {
+        GlassRow(icon: "slider.horizontal.3", title: L10n.string("settings.mainPanelOpacity")) {
+            Slider(
+                value: mainPanelOpacityBinding,
+                in: Double(MainPanelOpacity.minimumPercent)...Double(MainPanelOpacity.maximumPercent),
+                step: 1
+            )
+            .labelsHidden()
+            .frame(width: 150)
+            .accessibilityLabel(L10n.string("settings.mainPanelOpacity"))
+            .accessibilityValue("\(model.mainPanelOpacityPercent)%")
+            .help(L10n.string("settings.mainPanelOpacity"))
+
+            Text("\(model.mainPanelOpacityPercent)%")
+                .monospacedDigit()
+                .foregroundStyle(.secondary)
+                .frame(width: 42, alignment: .trailing)
         }
     }
 
@@ -538,6 +560,7 @@ public struct SettingsView: View {
             doubaoActionEnabled: model.doubaoActionEnabled,
             debugLoggingEnabled: model.debugLoggingEnabled,
             defaultPasteMode: model.defaultPasteMode,
+            mainPanelOpacityPercent: model.mainPanelOpacityPercent,
             detailFlags: [
                 model.showDetailSource, model.showDetailType,
                 model.showDetailCreatedAt, model.showDetailLastUsedAt,
@@ -552,6 +575,17 @@ public struct SettingsView: View {
             set: { language in
                 L10n.configure(language: language)
                 model.appLanguage = language
+            }
+        )
+    }
+
+    private var mainPanelOpacityBinding: Binding<Double> {
+        Binding(
+            get: { Double(model.mainPanelOpacityPercent) },
+            set: { value in
+                model.mainPanelOpacityPercent = MainPanelOpacity.clampedPercent(
+                    Int(value.rounded())
+                )
             }
         )
     }
@@ -580,6 +614,7 @@ private struct SettingsSnapshot: Equatable {
     let doubaoActionEnabled: Bool
     let debugLoggingEnabled: Bool
     let defaultPasteMode: String
+    let mainPanelOpacityPercent: Int
     let detailFlags: [Bool]
 
     var runtimeSnapshot: AppSettingsRuntimeSnapshot {
@@ -594,7 +629,8 @@ private struct SettingsSnapshot: Equatable {
                 maximumItemCount: maximumItemCount,
                 maximumStorageMB: maximumStorageMB
             ),
-            debugLoggingEnabled: debugLoggingEnabled
+            debugLoggingEnabled: debugLoggingEnabled,
+            mainPanelOpacityPercent: mainPanelOpacityPercent
         )
     }
 }

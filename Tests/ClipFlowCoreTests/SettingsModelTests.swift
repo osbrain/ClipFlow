@@ -209,6 +209,35 @@ struct SettingsModelTests {
         #expect(restored.listDensity == .compact)
     }
 
+    @Test("main panel opacity defaults clamps and persists as a percentage")
+    func mainPanelOpacityDefaultsClampsAndPersists() {
+        let permissions = FakePermissionStatus(accessibilityTrusted: false)
+        let empty = SettingsModel(store: MemorySettingsStore(), permissions: permissions)
+        #expect(empty.mainPanelOpacityPercent == 100)
+
+        let low = SettingsModel(
+            store: MemorySettingsStore(values: ["mainPanelOpacityPercent": 25]),
+            permissions: permissions
+        )
+        #expect(low.mainPanelOpacityPercent == 60)
+
+        let highStore = MemorySettingsStore()
+        let high = SettingsModel(store: highStore, permissions: permissions)
+        high.mainPanelOpacityPercent = 140
+        high.save()
+        #expect(high.mainPanelOpacityPercent == 100)
+        #expect(highStore.integer(forKey: "mainPanelOpacityPercent") == 100)
+
+        let persistedStore = MemorySettingsStore()
+        let persisted = SettingsModel(store: persistedStore, permissions: permissions)
+        persisted.mainPanelOpacityPercent = 82
+        persisted.save()
+        #expect(
+            SettingsModel(store: persistedStore, permissions: permissions)
+                .mainPanelOpacityPercent == 82
+        )
+    }
+
     @Test("persists an explicit application language")
     func persistsApplicationLanguage() {
         let store = MemorySettingsStore()
@@ -239,7 +268,8 @@ struct SettingsModelTests {
                 maximumItemCount: 10_000,
                 maximumStorageMB: 2_048
             ),
-            debugLoggingEnabled: false
+            debugLoggingEnabled: false,
+            mainPanelOpacityPercent: 100
         )
         let cases: [(AppSettingsRuntimeSnapshot, AppSettingsRuntimeChange)] = [
             (.init(copying: baseline, shortcut: .optionCommandV), .shortcut),
@@ -258,7 +288,8 @@ struct SettingsModelTests {
                 ),
                 .retention
             ),
-            (.init(copying: baseline, debugLoggingEnabled: true), .debugLogging)
+            (.init(copying: baseline, debugLoggingEnabled: true), .debugLogging),
+            (.init(copying: baseline, mainPanelOpacityPercent: 82), .panelOpacity)
         ]
 
         for (snapshot, expected) in cases {
