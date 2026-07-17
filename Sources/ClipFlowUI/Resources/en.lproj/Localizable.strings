@@ -171,8 +171,13 @@
 "settings.maximumItems" = "Maximum Items";
 "settings.storageLimit" = "Storage Limit";
 "settings.externalThreshold" = "Large Payload Threshold";
+"settings.retention.help" = "Controls how long ClipFlow keeps history before automatic cleanup.";
+"settings.maximumItems.help" = "When the history grows past this number, older non-favorite items are removed first.";
+"settings.storageLimit.help" = "Caps the encrypted local storage used by clipboard history.";
+"settings.externalThreshold.help" = "Content larger than this is stored as an encrypted external payload to keep the database responsive.";
 "settings.unit.megabytes" = "MB";
 "settings.accessibility" = "Automatic Paste";
+"settings.accessibility.help" = "Uses macOS Accessibility only to paste the selected item back into the previous app.";
 "settings.permission.granted" = "Granted";
 "settings.permission.notGranted" = "Not Granted";
 "settings.openSystemSettings" = "Open Settings";
@@ -182,6 +187,9 @@
 "settings.browserTabs" = "Browser Tab Management";
 "settings.feishuAction" = "Send to Feishu Action";
 "settings.doubaoAction" = "Ask Doubao Action";
+"settings.browserTabs.help" = "Shows supported browser tabs in the panel so you can search and activate them.";
+"settings.feishuAction.help" = "Adds a contextual action for sending compatible content to Feishu.";
+"settings.doubaoAction.help" = "Adds a contextual action for asking Doubao about selected text.";
 "settings.showSource" = "Source Application";
 "settings.showKind" = "Content Kind";
 "settings.showCreated" = "Created Time";
@@ -196,6 +204,9 @@
 "settings.logPath" = "Local Log";
 "settings.logNotCreated" = "Log file has not been created yet";
 "settings.revealLog" = "Show in Finder";
+"settings.openSource" = "Open Source";
+"settings.openSource.help" = "View the source code, releases, and issue tracker on GitHub.";
+"settings.openSource.openGitHub" = "Open GitHub";
 "history.time.justNow" = "Just now";
 "history.time.minutesAgo" = "%d min ago";
 "history.time.today" = "Today";

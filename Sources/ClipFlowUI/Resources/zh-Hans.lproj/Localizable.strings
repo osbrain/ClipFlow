@@ -171,8 +171,13 @@
 "settings.maximumItems" = "最大条目数";
 "settings.storageLimit" = "存储上限";
 "settings.externalThreshold" = "大内容外置阈值";
+"settings.retention.help" = "控制拾笺保留历史记录多久，超过策略后会自动清理。";
+"settings.maximumItems.help" = "历史记录超过这个数量后，会优先删除较旧且未收藏的条目。";
+"settings.storageLimit.help" = "限制剪贴板历史在本机占用的加密存储空间。";
+"settings.externalThreshold.help" = "超过此大小的内容会作为加密外部内容保存，避免数据库变慢。";
 "settings.unit.megabytes" = "MB";
 "settings.accessibility" = "自动粘贴";
+"settings.accessibility.help" = "仅用于把选中的内容自动粘贴回上一个应用，不会读取键盘输入。";
 "settings.permission.granted" = "已授权";
 "settings.permission.notGranted" = "未授权";
 "settings.openSystemSettings" = "打开系统设置";
@@ -182,6 +187,9 @@
 "settings.browserTabs" = "浏览器标签页管理";
 "settings.feishuAction" = "发送到飞书";
 "settings.doubaoAction" = "询问豆包";
+"settings.browserTabs.help" = "在主控面板里显示受支持浏览器的标签页，方便搜索和切换。";
+"settings.feishuAction.help" = "为兼容内容增加“发送到飞书”的右侧操作。";
+"settings.doubaoAction.help" = "为选中文本增加“询问豆包”的右侧操作。";
 "settings.showSource" = "来源应用";
 "settings.showKind" = "内容类型";
 "settings.showCreated" = "创建时间";
@@ -196,6 +204,9 @@
 "settings.logPath" = "本地日志";
 "settings.logNotCreated" = "日志文件尚未创建";
 "settings.revealLog" = "在访达中显示";
+"settings.openSource" = "开源项目";
+"settings.openSource.help" = "在 GitHub 查看源代码、版本发布和问题反馈。";
+"settings.openSource.openGitHub" = "打开 GitHub";
 "history.time.justNow" = "刚刚";
 "history.time.minutesAgo" = "%d 分钟前";
 "history.time.today" = "今天";

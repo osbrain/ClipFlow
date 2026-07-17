@@ -24,6 +24,19 @@ struct SettingsModelTests {
         #expect(!source.contains("Menu {\n                Picker"))
     }
 
+    @Test("settings sidebar and open source affordances have explicit hit targets")
+    func settingsSidebarAndOpenSourceAffordances() throws {
+        let sourceURL = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .appendingPathComponent("Sources/ClipFlowUI/SettingsView.swift")
+        let source = try String(contentsOf: sourceURL, encoding: .utf8)
+
+        #expect(source.contains(".contentShape(Rectangle())"))
+        #expect(source.contains("https://github.com/osbrain/ClipFlow"))
+    }
+
     @Test("retention preferences have stable stored values")
     func retentionPreferencesHaveStableStoredValues() {
         #expect(RetentionPreference.day.rawValue == "day")

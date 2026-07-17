@@ -124,6 +124,7 @@ public struct SettingsView: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.horizontal, 12)
                     .padding(.vertical, 9)
+                    .contentShape(Rectangle())
                     .foregroundStyle(
                         selectedCategory == category ? Color.white : Color.primary
                     )
@@ -265,7 +266,11 @@ public struct SettingsView: View {
     private var retentionSection: some View {
         GlassSection(title: L10n.string("settings.retention"), icon: "externaldrive") {
             VStack(spacing: 10) {
-                GlassRow(icon: "clock.arrow.circlepath", title: L10n.string("settings.retention")) {
+                GlassRow(
+                    icon: "clock.arrow.circlepath",
+                    title: L10n.string("settings.retention"),
+                    subtitle: L10n.string("settings.retention.help")
+                ) {
                     Picker(L10n.string("settings.retention"), selection: $model.retention) {
                         ForEach(RetentionPreference.allCases, id: \.self) { preference in
                             Text(L10n.string(preference.localizationKey)).tag(preference)
@@ -280,17 +285,23 @@ public struct SettingsView: View {
                 integerFieldRow(
                     icon: "list.number",
                     title: L10n.string("settings.maximumItems"),
-                    value: $model.maximumItemCount
+                    value: $model.maximumItemCount,
+                    subtitle: L10n.string("settings.maximumItems.help")
                 )
 
                 integerFieldRow(
                     icon: "internaldrive",
                     title: L10n.string("settings.storageLimit"),
                     value: $model.maximumStorageMB,
-                    unit: L10n.string("settings.unit.megabytes")
+                    unit: L10n.string("settings.unit.megabytes"),
+                    subtitle: L10n.string("settings.storageLimit.help")
                 )
 
-                GlassRow(icon: "doc.badge.arrow.up", title: L10n.string("settings.externalThreshold")) {
+                GlassRow(
+                    icon: "doc.badge.arrow.up",
+                    title: L10n.string("settings.externalThreshold"),
+                    subtitle: L10n.string("settings.externalThreshold.help")
+                ) {
                     Text(model.externalPayloadThresholdMB, format: .number)
                         .monospacedDigit()
                         .foregroundStyle(.secondary)
@@ -313,7 +324,11 @@ public struct SettingsView: View {
     private var permissionsSection: some View {
         GlassSection(title: L10n.string("settings.permissions"), icon: "hand.raised") {
             VStack(spacing: 10) {
-                GlassRow(icon: "accessibility", title: L10n.string("settings.accessibility")) {
+                GlassRow(
+                    icon: "accessibility",
+                    title: L10n.string("settings.accessibility"),
+                    subtitle: L10n.string("settings.accessibility.help")
+                ) {
                     Text(
                         L10n.string(
                             model.isAccessibilityTrusted
@@ -369,17 +384,20 @@ public struct SettingsView: View {
                 toggleRow(
                     icon: "globe",
                     title: L10n.string("settings.browserTabs"),
-                    isOn: $model.browserTabManagementEnabled
+                    isOn: $model.browserTabManagementEnabled,
+                    subtitle: L10n.string("settings.browserTabs.help")
                 )
                 toggleRow(
                     icon: "paperplane",
                     title: L10n.string("settings.feishuAction"),
-                    isOn: $model.feishuActionEnabled
+                    isOn: $model.feishuActionEnabled,
+                    subtitle: L10n.string("settings.feishuAction.help")
                 )
                 toggleRow(
                     icon: "sparkles",
                     title: L10n.string("settings.doubaoAction"),
-                    isOn: $model.doubaoActionEnabled
+                    isOn: $model.doubaoActionEnabled,
+                    subtitle: L10n.string("settings.doubaoAction.help")
                 )
             }
         }
@@ -414,38 +432,55 @@ public struct SettingsView: View {
     }
 
     private var detailFieldsSection: some View {
-        GlassSection(title: L10n.string("settings.details"), icon: "list.bullet.rectangle") {
-            VStack(spacing: 10) {
-                toggleRow(
-                    icon: "app.badge",
-                    title: L10n.string("settings.showSource"),
-                    isOn: $model.showDetailSource
-                )
-                toggleRow(
-                    icon: "doc.text.magnifyingglass",
-                    title: L10n.string("settings.showKind"),
-                    isOn: $model.showDetailType
-                )
-                toggleRow(
-                    icon: "calendar.badge.clock",
-                    title: L10n.string("settings.showCreated"),
-                    isOn: $model.showDetailCreatedAt
-                )
-                toggleRow(
-                    icon: "clock.arrow.2.circlepath",
-                    title: L10n.string("settings.showLastUsed"),
-                    isOn: $model.showDetailLastUsedAt
-                )
-                toggleRow(
-                    icon: "scalemass",
-                    title: L10n.string("settings.showSize"),
-                    isOn: $model.showDetailSize
-                )
-                toggleRow(
-                    icon: "textformat",
-                    title: L10n.string("settings.showFormatting"),
-                    isOn: $model.showDetailFormatting
-                )
+        VStack(spacing: 16) {
+            GlassSection(title: L10n.string("settings.details"), icon: "list.bullet.rectangle") {
+                VStack(spacing: 10) {
+                    toggleRow(
+                        icon: "app.badge",
+                        title: L10n.string("settings.showSource"),
+                        isOn: $model.showDetailSource
+                    )
+                    toggleRow(
+                        icon: "doc.text.magnifyingglass",
+                        title: L10n.string("settings.showKind"),
+                        isOn: $model.showDetailType
+                    )
+                    toggleRow(
+                        icon: "calendar.badge.clock",
+                        title: L10n.string("settings.showCreated"),
+                        isOn: $model.showDetailCreatedAt
+                    )
+                    toggleRow(
+                        icon: "clock.arrow.2.circlepath",
+                        title: L10n.string("settings.showLastUsed"),
+                        isOn: $model.showDetailLastUsedAt
+                    )
+                    toggleRow(
+                        icon: "scalemass",
+                        title: L10n.string("settings.showSize"),
+                        isOn: $model.showDetailSize
+                    )
+                    toggleRow(
+                        icon: "textformat",
+                        title: L10n.string("settings.showFormatting"),
+                        isOn: $model.showDetailFormatting
+                    )
+                }
+            }
+
+            GlassSection(title: L10n.string("settings.openSource"), icon: "chevron.left.forwardslash.chevron.right") {
+                GlassRow(
+                    icon: "link",
+                    title: "osbrain/ClipFlow",
+                    subtitle: L10n.string("settings.openSource.help")
+                ) {
+                    Link(
+                        L10n.string("settings.openSource.openGitHub"),
+                        destination: URL(string: "https://github.com/osbrain/ClipFlow")!
+                    )
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                }
             }
         }
     }
@@ -490,8 +525,13 @@ public struct SettingsView: View {
         NSWorkspace.shared.activateFileViewerSelecting([url])
     }
 
-    private func toggleRow(icon: String, title: String, isOn: Binding<Bool>) -> some View {
-        GlassRow(icon: icon, title: title) {
+    private func toggleRow(
+        icon: String,
+        title: String,
+        isOn: Binding<Bool>,
+        subtitle: String? = nil
+    ) -> some View {
+        GlassRow(icon: icon, title: title, subtitle: subtitle) {
             Toggle(title, isOn: isOn)
                 .labelsHidden()
                 .toggleStyle(.switch)
@@ -526,9 +566,10 @@ public struct SettingsView: View {
         icon: String,
         title: String,
         value: Binding<Int>,
-        unit: String? = nil
+        unit: String? = nil,
+        subtitle: String? = nil
     ) -> some View {
-        GlassRow(icon: icon, title: title) {
+        GlassRow(icon: icon, title: title, subtitle: subtitle) {
             TextField(title, value: value, format: .number)
                 .labelsHidden()
                 .multilineTextAlignment(.trailing)

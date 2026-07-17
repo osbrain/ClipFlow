@@ -32,6 +32,10 @@ struct AppearancePreferencesTests {
         )
         #expect(L10n.string("settings.title", locale: "zh-Hans") == "设置")
         #expect(L10n.string("history.search.placeholder", locale: "zh-Hans").contains("搜索"))
+        #expect(L10n.string("settings.retention.help", locale: "zh-Hans").contains("自动清理"))
+        #expect(L10n.string("settings.accessibility.help", locale: "zh-Hans").contains("自动粘贴"))
+        #expect(L10n.string("settings.openSource", locale: "en") == "Open Source")
+        #expect(L10n.string("settings.openSource", locale: "zh-Hans") == "开源项目")
     }
 
     @Test("application languages have stable values and select explicit resources")

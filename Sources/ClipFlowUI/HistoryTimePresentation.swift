@@ -7,41 +7,13 @@ public enum HistoryTimePresentation {
         calendar: Calendar = .current,
         locale: Locale = L10n.locale
     ) -> String {
-        let elapsed = now.timeIntervalSince(date)
-        if elapsed < 60 {
-            return localized("history.time.justNow", locale: locale)
-        }
-        if elapsed < 3_600 {
-            let minutes = max(1, Int(elapsed / 60))
-            return String(
-                format: localized("history.time.minutesAgo", locale: locale),
-                locale: locale,
-                minutes
-            )
-        }
-        if calendar.isDate(date, inSameDayAs: now) {
-            return localized("history.time.today", locale: locale)
-        }
-        if let yesterday = calendar.date(
-            byAdding: .day,
-            value: -1,
-            to: calendar.startOfDay(for: now)
-        ), calendar.isDate(date, inSameDayAs: yesterday) {
-            return localized("history.time.yesterday", locale: locale)
-        }
-
-        return date.formatted(
-            Date.FormatStyle(
-                date: .abbreviated,
-                time: .omitted,
-                locale: locale,
-                calendar: calendar,
-                timeZone: calendar.timeZone
-            )
-        )
-    }
-
-    private static func localized(_ key: String, locale: Locale) -> String {
-        L10n.string(key, locale: locale.identifier)
+        let formatter = DateFormatter()
+        formatter.calendar = calendar
+        formatter.locale = locale
+        formatter.timeZone = calendar.timeZone
+        formatter.dateFormat = locale.identifier.hasPrefix("zh")
+            ? "M月d日 HH:mm:ss"
+            : "MMM d HH:mm:ss"
+        return formatter.string(from: date)
     }
 }
