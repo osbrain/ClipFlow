@@ -42,6 +42,10 @@ public enum HistoryFilterStripLayout {
     public static func isPrimary(_ filter: HistoryFilter) -> Bool {
         filter == .all || filter == .favorites
     }
+
+    public static func isOverflowMenuSelected(_ filter: HistoryFilter) -> Bool {
+        !isPrimary(filter)
+    }
 }
 
 public struct HistoryRepositoryFilterState: Equatable, Sendable {

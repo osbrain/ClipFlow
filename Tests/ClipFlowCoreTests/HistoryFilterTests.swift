@@ -13,6 +13,18 @@ struct HistoryFilterTests {
         #expect(!HistoryFilterStripLayout.isPrimary(.browserTabs))
     }
 
+    @Test("compact overflow menu stays highlighted for selected overflow filters")
+    func compactOverflowMenuSelectionPersists() {
+        let categoryID = UUID()
+
+        #expect(!HistoryFilterStripLayout.isOverflowMenuSelected(.all))
+        #expect(!HistoryFilterStripLayout.isOverflowMenuSelected(.favorites))
+        #expect(HistoryFilterStripLayout.isOverflowMenuSelected(.kind(.text)))
+        #expect(HistoryFilterStripLayout.isOverflowMenuSelected(.kind(.image)))
+        #expect(HistoryFilterStripLayout.isOverflowMenuSelected(.category(categoryID)))
+        #expect(HistoryFilterStripLayout.isOverflowMenuSelected(.browserTabs))
+    }
+
     @Test("kind filters map to one exclusive repository kind")
     func kindMappingIsExclusive() {
         #expect(

@@ -631,10 +631,11 @@ private struct HistoryFilterStrip: View {
                 FilterMenuChip(
                     title: L10n.string("filter.more"),
                     icon: "ellipsis.circle",
-                    isSelected: !HistoryFilterStripLayout.isPrimary(selectedFilter)
+                    isSelected: HistoryFilterStripLayout.isOverflowMenuSelected(selectedFilter)
                 )
             }
             .menuStyle(.borderlessButton)
+            .buttonStyle(.plain)
             .fixedSize()
             .help(L10n.string("filter.more"))
         }
