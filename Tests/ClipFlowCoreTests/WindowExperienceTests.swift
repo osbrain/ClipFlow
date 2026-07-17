@@ -93,7 +93,7 @@ struct WindowExperienceTests {
         #expect(discovered.contains { $0 === second })
     }
 
-    @Test("settings window keeps native titlebar controls unobstructed")
+    @Test("settings window uses one continuous translucent background")
     func settingsWindowAppearance() {
         let window = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: 640, height: 700),
@@ -105,11 +105,12 @@ struct WindowExperienceTests {
 
         SettingsWindowAppearance.apply(to: window)
 
-        #expect(!window.styleMask.contains(.fullSizeContentView))
+        #expect(window.styleMask.contains(.fullSizeContentView))
         #expect(window.title.isEmpty)
-        #expect(!window.titlebarAppearsTransparent)
-        #expect(window.isOpaque)
-        #expect(window.backgroundColor == .windowBackgroundColor)
+        #expect(window.titleVisibility == .hidden)
+        #expect(window.titlebarAppearsTransparent)
+        #expect(!window.isOpaque)
+        #expect(window.backgroundColor == .clear)
     }
 
     @Test("settings window keeps usable traffic lights at a fixed rectangular size")

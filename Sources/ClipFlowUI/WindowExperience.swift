@@ -27,11 +27,12 @@ public enum SettingsWindowAppearance {
         window.standardWindowButton(.miniaturizeButton)?.isEnabled = true
         window.standardWindowButton(.miniaturizeButton)?.isHidden = false
         window.standardWindowButton(.zoomButton)?.isHidden = true
-        window.styleMask.remove(.fullSizeContentView)
+        window.styleMask.formUnion(.fullSizeContentView)
         window.title = ""
-        window.backgroundColor = .windowBackgroundColor
-        window.isOpaque = true
-        window.titlebarAppearsTransparent = false
+        window.titleVisibility = .hidden
+        window.backgroundColor = .clear
+        window.isOpaque = false
+        window.titlebarAppearsTransparent = true
     }
 }
 
