@@ -214,7 +214,9 @@ struct MetadataCard: View {
         VStack(alignment: .leading, spacing: 8) {
             Image(systemName: icon)
                 .font(.callout.weight(.semibold))
-                .foregroundStyle(.secondary)
+                .symbolRenderingMode(.hierarchical)
+                .foregroundStyle(.tint)
+                .frame(height: 18, alignment: .leading)
                 .accessibilityHidden(true)
 
             Text(title)
