@@ -12,6 +12,18 @@ struct SettingsModelTests {
         #expect(SettingsControlLayout.menuWidth == 148)
     }
 
+    @Test("settings selection controls open their options directly")
+    func settingsSelectionControlsOpenOptionsDirectly() throws {
+        let sourceURL = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .appendingPathComponent("Sources/ClipFlowUI/SettingsView.swift")
+        let source = try String(contentsOf: sourceURL, encoding: .utf8)
+
+        #expect(!source.contains("Menu {\n                Picker"))
+    }
+
     @Test("retention preferences have stable stored values")
     func retentionPreferencesHaveStableStoredValues() {
         #expect(RetentionPreference.day.rawValue == "day")

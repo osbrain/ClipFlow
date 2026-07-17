@@ -486,32 +486,16 @@ public struct SettingsView: View {
         @ViewBuilder content: () -> Content
     ) -> some View {
         GlassRow(icon: icon, title: title) {
-            Menu {
-                Picker(title, selection: selection, content: content)
-            } label: {
-                HStack(spacing: 8) {
-                    Text(valueLabel)
-                        .lineLimit(1)
-                        .truncationMode(.tail)
-                    Spacer(minLength: 0)
-                    Image(systemName: "chevron.up.chevron.down")
-                        .font(.caption2.weight(.semibold))
-                        .foregroundStyle(.secondary)
-                }
-                .padding(.horizontal, 9)
+            Picker(title, selection: selection, content: content)
+                .pickerStyle(.menu)
+                .labelsHidden()
                 .frame(
                     width: SettingsControlLayout.menuWidth,
                     height: SettingsControlLayout.menuHeight
                 )
-                .background(.primary.opacity(0.055), in: RoundedRectangle(cornerRadius: 7))
-                .overlay {
-                    RoundedRectangle(cornerRadius: 7)
-                        .stroke(.primary.opacity(0.10), lineWidth: 1)
-                }
-            }
-            .menuStyle(.borderlessButton)
-            .fixedSize(horizontal: true, vertical: false)
+                .fixedSize(horizontal: true, vertical: false)
                 .accessibilityLabel(title)
+                .accessibilityValue(valueLabel)
                 .help(title)
         }
     }
