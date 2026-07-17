@@ -133,6 +133,9 @@
 "settings.window.title" = "拾笺设置";
 "settings.subtitle" = "偏好、授权与诊断";
 "settings.general" = "通用";
+"settings.sidebar.storage" = "存储";
+"settings.sidebar.permissions" = "权限";
+"settings.sidebar.details" = "详情";
 "settings.language" = "语言";
 "settings.language.system" = "跟随系统";
 "settings.language.simplifiedChinese" = "简体中文";

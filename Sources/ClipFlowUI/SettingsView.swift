@@ -4,8 +4,55 @@ import ClipFlowSystem
 import SwiftUI
 
 public enum SettingsControlLayout {
-    public static let menuWidth: CGFloat = 168
+    public static let sidebarWidth: CGFloat = 172
+    public static let menuWidth: CGFloat = 148
     static let menuHeight: CGFloat = 28
+}
+
+enum SettingsCategory: CaseIterable, Hashable, Identifiable {
+    case general
+    case storage
+    case permissions
+    case startup
+    case details
+    case diagnostics
+
+    var id: Self { self }
+
+    var titleKey: String {
+        switch self {
+        case .general: "settings.general"
+        case .storage: "settings.retention"
+        case .permissions: "settings.permissions"
+        case .startup: "settings.startup"
+        case .details: "settings.details"
+        case .diagnostics: "settings.diagnostics"
+        }
+    }
+
+    var sidebarTitleKey: String {
+        switch self {
+        case .general, .startup, .diagnostics:
+            titleKey
+        case .storage:
+            "settings.sidebar.storage"
+        case .permissions:
+            "settings.sidebar.permissions"
+        case .details:
+            "settings.sidebar.details"
+        }
+    }
+
+    var symbolName: String {
+        switch self {
+        case .general: "gearshape"
+        case .storage: "externaldrive"
+        case .permissions: "hand.raised"
+        case .startup: "power"
+        case .details: "list.bullet.rectangle"
+        case .diagnostics: "stethoscope"
+        }
+    }
 }
 
 public struct SettingsView: View {
@@ -16,6 +63,7 @@ public struct SettingsView: View {
         AppSettingsRuntimeSnapshot
     ) -> Void
     @State private var isRestoringLoginItem = false
+    @State private var selectedCategory: SettingsCategory = .general
 
     public init(
         model: SettingsModel,
@@ -31,25 +79,11 @@ public struct SettingsView: View {
     }
 
     public var body: some View {
-        ScrollView {
-            LazyVStack(alignment: .leading, spacing: 18) {
-                SettingsHeader()
-                if let message = model.runtimeErrorMessage {
-                    SettingsErrorBanner(
-                        message: message,
-                        dismiss: model.clearRuntimeError
-                    )
-                }
-                generalSection
-                retentionSection
-                permissionsSection
-                startupSection
-                detailFieldsSection
-                diagnosticsSection
-            }
-            .padding(18)
+        HStack(spacing: 0) {
+            settingsSidebar
+            Divider()
+            settingsDetail
         }
-        .clipFlowScrollAppearance()
         .background {
             Rectangle()
                 .fill(.regularMaterial)
@@ -73,6 +107,70 @@ public struct SettingsView: View {
                 guard !Task.isCancelled else { return }
                 await model.refreshPermissions()
             }
+        }
+    }
+
+    private var settingsSidebar: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            ForEach(SettingsCategory.allCases) { category in
+                Button {
+                    selectedCategory = category
+                } label: {
+                    Label(
+                        L10n.string(category.sidebarTitleKey),
+                        systemImage: category.symbolName
+                    )
+                    .font(.body.weight(.medium))
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 9)
+                    .foregroundStyle(
+                        selectedCategory == category ? Color.white : Color.primary
+                    )
+                    .background(
+                        selectedCategory == category ? Color.accentColor : Color.clear,
+                        in: RoundedRectangle(cornerRadius: 9)
+                    )
+                }
+                .buttonStyle(.plain)
+                .accessibilityAddTraits(selectedCategory == category ? .isSelected : [])
+                .accessibilityLabel(L10n.string(category.sidebarTitleKey))
+                .help(L10n.string(category.sidebarTitleKey))
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(12)
+        .frame(width: SettingsControlLayout.sidebarWidth, alignment: .topLeading)
+    }
+
+    private var settingsDetail: some View {
+        ScrollView {
+            LazyVStack(alignment: .leading, spacing: 16) {
+                Text(L10n.string(selectedCategory.titleKey))
+                    .font(.title2.weight(.semibold))
+                if let message = model.runtimeErrorMessage {
+                    SettingsErrorBanner(
+                        message: message,
+                        dismiss: model.clearRuntimeError
+                    )
+                }
+                selectedSection
+            }
+            .padding(18)
+        }
+        .clipFlowScrollAppearance()
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    }
+
+    @ViewBuilder
+    private var selectedSection: some View {
+        switch selectedCategory {
+        case .general: generalSection
+        case .storage: retentionSection
+        case .permissions: permissionsSection
+        case .startup: startupSection
+        case .details: detailFieldsSection
+        case .diagnostics: diagnosticsSection
         }
     }
 
@@ -479,37 +577,6 @@ public struct SettingsView: View {
             string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility"
         ) else { return }
         NSWorkspace.shared.open(url)
-    }
-}
-
-private struct SettingsHeader: View {
-    var body: some View {
-        HStack(spacing: 14) {
-            Image(systemName: "slider.horizontal.3")
-                .font(.system(size: 24, weight: .semibold))
-                .foregroundStyle(.white)
-                .frame(width: 48, height: 48)
-                .background(
-                    LinearGradient(
-                        colors: [.accentColor, .accentColor.opacity(0.68)],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    ),
-                    in: RoundedRectangle(cornerRadius: 14)
-                )
-                .shadow(color: Color.accentColor.opacity(0.24), radius: 10, y: 4)
-                .accessibilityHidden(true)
-
-            VStack(alignment: .leading, spacing: 3) {
-                Text(L10n.string("settings.title"))
-                    .font(.title2.weight(.semibold))
-                    .foregroundStyle(.primary)
-                Text(L10n.string("settings.subtitle"))
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-            }
-        }
-        .accessibilityElement(children: .combine)
     }
 }
 

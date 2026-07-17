@@ -69,4 +69,14 @@ struct AppearancePreferencesTests {
             ) == "en"
         )
     }
+
+    @Test("settings sidebar uses concise localized category labels")
+    func settingsSidebarUsesConciseLocalizedCategoryLabels() {
+        #expect(L10n.string("settings.sidebar.storage", locale: "en") == "Storage")
+        #expect(L10n.string("settings.sidebar.permissions", locale: "en") == "Permissions")
+        #expect(L10n.string("settings.sidebar.details", locale: "en") == "Details")
+        #expect(L10n.string("settings.sidebar.storage", locale: "zh-Hans") == "存储")
+        #expect(L10n.string("settings.sidebar.permissions", locale: "zh-Hans") == "权限")
+        #expect(L10n.string("settings.sidebar.details", locale: "zh-Hans") == "详情")
+    }
 }

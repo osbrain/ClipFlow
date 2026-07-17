@@ -7,9 +7,9 @@ import ClipFlowSystem
 @Suite("Settings model")
 @MainActor
 struct SettingsModelTests {
-    @Test("settings menu controls use a compact fixed width")
-    func settingsMenuControlsUseCompactFixedWidth() {
-        #expect(SettingsControlLayout.menuWidth == 168)
+    @Test("settings controls reserve room for a compact sidebar")
+    func settingsControlsReserveRoomForCompactSidebar() {
+        #expect(SettingsControlLayout.menuWidth == 148)
     }
 
     @Test("retention preferences have stable stored values")

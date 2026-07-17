@@ -133,6 +133,9 @@
 "settings.window.title" = "ClipFlow Settings";
 "settings.subtitle" = "Preferences, permissions, and diagnostics";
 "settings.general" = "General";
+"settings.sidebar.storage" = "Storage";
+"settings.sidebar.permissions" = "Permissions";
+"settings.sidebar.details" = "Details";
 "settings.language" = "Language";
 "settings.language.system" = "Follow System";
 "settings.language.simplifiedChinese" = "简体中文";
