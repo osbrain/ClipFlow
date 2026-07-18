@@ -320,8 +320,12 @@ public final class AppModel {
 
     public func renameSelection(to title: String?) async {
         guard let item = selectedItem else { return }
+        await renameItem(item.id, to: title)
+    }
+
+    public func renameItem(_ id: UUID, to title: String?) async {
         do {
-            try repository.rename(item.id, title: title)
+            try repository.rename(id, title: title)
             errorMessage = nil
             await reload()
         } catch {
@@ -331,10 +335,16 @@ public final class AppModel {
 
     public func deleteSelection() async {
         guard let item = selectedItem else { return }
+        await deleteItem(item.id)
+    }
+
+    public func deleteItem(_ id: UUID) async {
         do {
-            try repository.delete(item.id)
+            try repository.delete(id)
             errorMessage = nil
-            selectedItemID = nil
+            if selectedItemID == id {
+                selectedItemID = nil
+            }
             await reload()
         } catch {
             errorMessage = L10n.string("error.delete")

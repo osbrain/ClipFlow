@@ -130,6 +130,22 @@ struct ClipboardPerformanceSmokeTests {
         #expect(!source.contains("Text(item.updatedAt, style: .relative)"))
         #expect(!source.contains("isSelected ? AnyShapeStyle(.thinMaterial)"))
         #expect(source.contains("HistoryTimePresentation.text(for: item.updatedAt)"))
+        #expect(!source.contains("model.apply(.browserTabs)"))
+    }
+
+    @Test("status menu item reveal keeps panel input search state synchronized")
+    func statusMenuRevealSyncsInputSearchState() throws {
+        let repositoryRoot = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let source = try String(
+            contentsOf: repositoryRoot
+                .appendingPathComponent("Sources/ClipFlowApp/ClipFlowApp.swift"),
+            encoding: .utf8
+        )
+
+        #expect(source.contains("inputStateStore?.searchText = \"\""))
     }
 }
 

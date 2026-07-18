@@ -86,3 +86,36 @@ public struct KeychainKeyStore: Sendable {
         ]
     }
 }
+
+public enum DatabaseKeychainService {
+    public static let legacyService = "local.clipflow.app"
+
+    private static let markerFileName = "keychain-service"
+
+    public static func resolvedService(
+        applicationSupport: URL,
+        hasExistingDatabase: Bool
+    ) throws -> String {
+        let markerURL = applicationSupport.appendingPathComponent(
+            markerFileName,
+            isDirectory: false
+        )
+        if let service = try? String(contentsOf: markerURL, encoding: .utf8)
+            .trimmingCharacters(in: .whitespacesAndNewlines),
+           !service.isEmpty {
+            return service
+        }
+
+        if hasExistingDatabase {
+            return legacyService
+        }
+
+        let service = "\(legacyService).\(UUID().uuidString)"
+        try service.write(to: markerURL, atomically: true, encoding: .utf8)
+        try FileManager.default.setAttributes(
+            [.posixPermissions: 0o600],
+            ofItemAtPath: markerURL.path
+        )
+        return service
+    }
+}

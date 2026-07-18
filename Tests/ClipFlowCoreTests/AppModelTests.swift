@@ -127,6 +127,28 @@ struct AppModelTests {
         #expect(repository.deletedIDs == [item.id])
     }
 
+    @Test("targeted item actions keep their original item even if selection changes")
+    func targetedItemActionsIgnoreSelectionDrift() async {
+        let first = Self.item(preview: "First")
+        let second = Self.item(preview: "Second")
+        let repository = FakeHistoryRepository(items: [first, second])
+        let model = AppModel(
+            repository: repository,
+            pasteService: FakePasteService()
+        )
+        await model.reload()
+
+        model.selectedItemID = first.id
+        model.selectedItemID = second.id
+        await model.renameItem(first.id, to: "Pinned rename")
+        await model.deleteItem(first.id)
+
+        #expect(repository.renameChanges.count == 1)
+        #expect(repository.renameChanges.first?.0 == first.id)
+        #expect(repository.renameChanges.first?.1 == "Pinned rename")
+        #expect(repository.deletedIDs == [first.id])
+    }
+
     @Test("creates assigns and deletes a custom category")
     func managesCustomCategory() async {
         let item = Self.item(preview: "Categorize")

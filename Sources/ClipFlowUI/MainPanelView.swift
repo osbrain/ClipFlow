@@ -13,7 +13,9 @@ public struct MainPanelView: View {
     @FocusState private var focusTarget: PanelFocusTarget?
     @State private var showingRename = false
     @State private var renameText = ""
+    @State private var pendingRenameItemID: UUID?
     @State private var showingDeleteConfirmation = false
+    @State private var pendingDeleteItemID: UUID?
     @State private var showingCreateCategory = false
     @State private var categoryName = ""
     @State private var historyReloadTask: Task<Void, Never>?
@@ -108,13 +110,17 @@ public struct MainPanelView: View {
             TextField(L10n.string("rename.title.placeholder"), text: $renameText)
             Button(L10n.string("common.cancel"), role: .cancel) {}
             Button(L10n.string("common.save")) {
-                Task { await model.renameSelection(to: renameText) }
+                if let pendingRenameItemID {
+                    Task { await model.renameItem(pendingRenameItemID, to: renameText) }
+                }
             }
         }
         .alert(L10n.string("action.delete"), isPresented: $showingDeleteConfirmation) {
             Button(L10n.string("common.cancel"), role: .cancel) {}
             Button(L10n.string("action.delete"), role: .destructive) {
-                Task { await model.deleteSelection() }
+                if let pendingDeleteItemID {
+                    Task { await model.deleteItem(pendingDeleteItemID) }
+                }
             }
         } message: {
             Text(L10n.string("delete.confirmation.message"))
@@ -245,7 +251,6 @@ public struct MainPanelView: View {
     private func selectFilter(_ filter: HistoryFilter) {
         focusTarget = nil
         if filter == .browserTabs, let browserModel {
-            model.apply(.browserTabs)
             browserModel.isShowing = true
             browserModel.searchText = ""
             inputState.searchText = ""
@@ -279,18 +284,23 @@ public struct MainPanelView: View {
         if inputState.isPresentingSheet {
             inputState.focus = .editing
         } else {
+            pendingRenameItemID = nil
+            pendingDeleteItemID = nil
             synchronizeFocusState()
         }
     }
 
     private func beginRename() {
-        renameText = model.selectedItem?.customTitle
-            ?? model.selectedItem?.previewText
+        let item = model.selectedItem
+        pendingRenameItemID = item?.id
+        renameText = item?.customTitle
+            ?? item?.previewText
             ?? ""
         showingRename = true
     }
 
     private func beginDelete() {
+        pendingDeleteItemID = model.selectedItemID
         showingDeleteConfirmation = true
     }
 

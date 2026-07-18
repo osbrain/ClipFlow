@@ -51,6 +51,16 @@ public struct BrowserTab: Identifiable, Equatable, Sendable {
     }
 }
 
+public struct BrowserTabSnapshot: Equatable, Sendable {
+    public let status: BrowserAutomationStatus
+    public let tabs: [BrowserTab]
+
+    public init(status: BrowserAutomationStatus, tabs: [BrowserTab] = []) {
+        self.status = status
+        self.tabs = tabs
+    }
+}
+
 public protocol BrowserWorkspaceProviding: Sendable {
     func isInstalled(_ browser: BrowserKind) -> Bool
     func isRunning(_ browser: BrowserKind) -> Bool
@@ -73,15 +83,22 @@ public struct BrowserAutomation: Sendable {
     }
 
     public func status(for browser: BrowserKind) -> BrowserAutomationStatus {
-        guard workspace.isInstalled(browser) else { return .notInstalled }
-        guard workspace.isRunning(browser) else { return .notRunning }
+        snapshot(for: browser).status
+    }
+
+    public func snapshot(for browser: BrowserKind) -> BrowserTabSnapshot {
+        guard workspace.isInstalled(browser) else {
+            return BrowserTabSnapshot(status: .notInstalled)
+        }
+        guard workspace.isRunning(browser) else {
+            return BrowserTabSnapshot(status: .notRunning)
+        }
         do {
-            _ = try tabs(for: browser)
-            return .authorized
+            return BrowserTabSnapshot(status: .authorized, tabs: try tabs(for: browser))
         } catch BrowserAutomationError.notAuthorized {
-            return .notAuthorized
+            return BrowserTabSnapshot(status: .notAuthorized)
         } catch {
-            return .notAuthorized
+            return BrowserTabSnapshot(status: .notAuthorized)
         }
     }
 

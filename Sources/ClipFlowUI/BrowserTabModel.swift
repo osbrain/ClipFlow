@@ -5,10 +5,27 @@ import Observation
 public protocol BrowserTabServing: Sendable {
     func status(for browser: BrowserKind) -> BrowserAutomationStatus
     func tabs(for browser: BrowserKind) throws -> [BrowserTab]
+    func snapshot(for browser: BrowserKind) -> BrowserTabSnapshot
     func activate(_ tab: BrowserTab) throws
 }
 
 extension BrowserAutomation: BrowserTabServing {}
+
+public extension BrowserTabServing {
+    func snapshot(for browser: BrowserKind) -> BrowserTabSnapshot {
+        let status = status(for: browser)
+        guard status == .authorized else {
+            return BrowserTabSnapshot(status: status)
+        }
+        do {
+            return BrowserTabSnapshot(status: status, tabs: try tabs(for: browser))
+        } catch BrowserAutomationError.notAuthorized {
+            return BrowserTabSnapshot(status: .notAuthorized)
+        } catch {
+            return BrowserTabSnapshot(status: .notAuthorized)
+        }
+    }
+}
 
 @MainActor
 @Observable
@@ -44,11 +61,9 @@ public final class BrowserTabModel {
         var collected: [BrowserTab] = []
         var nextStatuses: [BrowserKind: BrowserAutomationStatus] = [:]
         for browser in BrowserKind.allCases {
-            let status = service.status(for: browser)
-            nextStatuses[browser] = status
-            if status == .authorized, let browserTabs = try? service.tabs(for: browser) {
-                collected.append(contentsOf: browserTabs)
-            }
+            let snapshot = service.snapshot(for: browser)
+            nextStatuses[browser] = snapshot.status
+            collected.append(contentsOf: snapshot.tabs)
         }
         statuses = nextStatuses
         tabs = collected.sorted {

@@ -97,6 +97,25 @@ struct BrowserAutomationTests {
 
         #expect(model.errorMessage != nil)
     }
+
+    @Test("browser snapshots enumerate authorized tabs once")
+    func browserSnapshotEnumeratesTabsOnce() {
+        let workspace = FakeBrowserWorkspace(
+            installed: [.chrome],
+            running: [.chrome]
+        )
+        let runner = FakeAppleEventRunner()
+        runner.output = """
+        [{"windowIndex":0,"tabIndex":0,"title":"OpenAI","url":"https://openai.com"}]
+        """
+        let service = BrowserAutomation(workspace: workspace, runner: runner)
+
+        let snapshot = service.snapshot(for: .chrome)
+
+        #expect(snapshot.status == .authorized)
+        #expect(snapshot.tabs.count == 1)
+        #expect(runner.runCount == 1)
+    }
 }
 
 private final class FakeBrowserWorkspace: BrowserWorkspaceProviding, @unchecked Sendable {
@@ -143,13 +162,20 @@ private final class FakeAppleEventRunner: AppleEventRunning, @unchecked Sendable
         lock.withLock { storedLastScript }
     }
 
+    var runCount: Int {
+        lock.withLock { storedRunCount }
+    }
+
     func run(script: String, arguments: [String]) throws -> String {
         try lock.withLock {
+            storedRunCount += 1
             storedLastScript = script
             if let storedError { throw storedError }
             return storedOutput
         }
     }
+
+    private var storedRunCount = 0
 }
 
 private final class FakeBrowserTabService: BrowserTabServing, @unchecked Sendable {

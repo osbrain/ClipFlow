@@ -29,6 +29,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var settingsWindow: NSWindowController?
     private var settingsModel: SettingsModel?
     private var appModel: AppModel?
+    private var inputStateStore: PanelInputStateStore?
     private var historyRepository: (any HistoryRepository)?
     private var captureProcessor: ClipboardCaptureProcessor?
     private var isRestoringRuntimeSettings = false
@@ -257,6 +258,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             self.pasteService = pasteService
             self.settingsModel = settings
             self.appModel = model
+            self.inputStateStore = inputState
             self.historyRepository = repository
             self.captureProcessor = captureProcessor
             self.logger = logger
@@ -627,6 +629,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
 
         appModel.searchText = ""
+        inputStateStore?.searchText = ""
         appModel.apply(.all)
         Task { @MainActor [weak self, weak appModel] in
             guard let self, let appModel else { return }
@@ -761,8 +764,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         )
         return key
         #else
+        let databaseURL = applicationSupport.appendingPathComponent(
+            "ClipFlow.sqlite",
+            isDirectory: false
+        )
+        let service = try DatabaseKeychainService.resolvedService(
+            applicationSupport: applicationSupport,
+            hasExistingDatabase: FileManager.default.fileExists(atPath: databaseURL.path)
+        )
         return try KeychainKeyStore(
-            service: "local.clipflow.app",
+            service: service,
             account: "database-key"
         ).loadOrCreate()
         #endif
