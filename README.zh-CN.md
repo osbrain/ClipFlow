@@ -104,6 +104,10 @@ open artifacts/ClipFlow.app
 
 欢迎提交 Issue 和 Pull Request。请保持改动聚焦；在适用时补充相关测试；未经过讨论，请勿加入网络服务、分析工具或远程剪贴板处理功能。
 
+## Links
+
+- [LinuxDo](https://linux.do/)
+
 ## 许可证
 
 ClipFlow 使用 [PolyForm Noncommercial License 1.0.0](LICENSE)。该许可证允许个人及其他非商业用途下的使用、修改和分发，但**禁止任何商业用途**。

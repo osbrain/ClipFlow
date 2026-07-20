@@ -106,6 +106,10 @@ The packaged app and DMG are written to `artifacts/`.
 
 Issues and pull requests are welcome. Please keep changes focused, include relevant tests where practical, and do not add network services, analytics, or remote clipboard processing without prior discussion.
 
+## Links
+
+- [LinuxDo](https://linux.do/)
+
 ## License
 
 ClipFlow is available under the [PolyForm Noncommercial License 1.0.0](LICENSE). It permits personal and other non-commercial use, modification, and distribution, but **prohibits commercial use**.
