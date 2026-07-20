@@ -8,19 +8,31 @@ In Simplified Chinese, the app is presented as **拾笺**.
 
 ## Highlights
 
-- Capture and restore text, rich text, links, files, images, PDFs, and other supported pasteboard representations.
-- Search clipboard history and browse it by content type, favorites, links, files, images, browser tabs, and custom categories.
-- Open a floating clipboard panel with `Command` + `Shift` + `V`, then paste, favorite, rename, categorize, preview, or delete an item without leaving the keyboard.
-- Use type-specific actions such as paste file, paste file path, show in Finder, open links, copy domains, and full preview.
-- Choose original-format or plain-text paste behavior.
-- Pin frequently used clips to slots `1` through `9`, then paste them globally with `Option` + `Command` + `1` through `9` even while the ClipFlow panel is closed. Build a sequential paste queue in one batch and paste its next item globally with `Option` + `Shift` + `Command` + `V`.
-- Recognize text in newly copied images locally with macOS Vision and search it from the same history field.
-- Mark sensitive clips as one-time or auto-expiring; temporary clips are removed after successful paste or expiry and are excluded from backups.
-- Save text clips as variable templates such as `Hello {{name}}`, fill the variables when needed, then paste the rendered text.
+### Fast capture, search, and paste
+
+- Capture text, rich text, links, files, images, PDFs, and other supported pasteboard representations; repeated captures are deduplicated.
+- Search one history across content, source app, links, files, images, browser tabs, OCR text, favorites, and smart categories.
+- Open the floating panel with the configurable wake shortcut (default: `Command` + `Shift` + `V`), then paste, preview, favorite, rename, categorize, or delete without leaving the keyboard.
+- Paste in original format or as plain text. File, image, link, and text clips expose purpose-built actions such as **Paste File Path**, **Show in Finder**, **Open Link**, **Copy Domain**, and full preview.
+
+### Quick Paste and Sequential Paste
+
+- Pin frequently used clips to slots `1` through `9`. Use `Option` + `Command` + `1` through `9` to paste a slot globally, even with the panel closed.
+- Build a **Sequential Paste** queue from one or many history items, then paste the next item globally with `Option` + `Shift` + `Command` + `V`.
+- The panel clearly shows the current destination app, quick-paste slots, queue state, and shortcut hints.
+
+### Organize and reuse content
+
+- Classify clips automatically by type and smart categories, and recognize text in newly copied images locally with macOS Vision.
+- Mark sensitive clips as one-time or auto-expiring. Temporary clips are removed after successful paste or expiry and are excluded from backups.
+- Save reusable text as variable templates such as `Hello {{name}}`, fill the variables when needed, and paste the rendered result.
 - Optionally browse and activate tabs from Safari, Google Chrome, and Microsoft Edge.
+
+### Private by design
+
+- Back up and restore encrypted ClipFlow data with integrity validation and import limits.
 - Encrypt clipboard metadata with SQLCipher and encrypt large local payload files separately.
-- Deduplicate repeated clipboard captures and keep the history list responsive with bounded loads and static time labels.
-- Run entirely on your Mac: no accounts, advertising, analytics, telemetry, or cloud clipboard processing.
+- Keep all processing on your Mac: no accounts, advertising, analytics, telemetry, or cloud clipboard processing.
 
 ## Screenshots
 
@@ -40,7 +52,7 @@ In Simplified Chinese, the app is presented as **拾笺**.
 
 Clipboard data is stored locally. ClipFlow requests optional macOS permissions only when a related feature needs them:
 
-- **Accessibility** lets ClipFlow automatically paste into the previously active app. Without it, ClipFlow restores the clipboard and you can paste manually.
+- **Accessibility** lets ClipFlow automatically paste into the previously active app. Without it, ClipFlow copies the selected content, keeps the panel open, and tells you how to paste manually or re-authorize the installed app.
 - **Automation** is required only if you enable browser-tab integration; browser control stays on your Mac.
 - **Launch at Login** is optional.
 
@@ -61,7 +73,7 @@ For GitHub Releases, use the DMG when sharing with friends:
 3. Launch ClipFlow from Applications.
 4. If macOS blocks it, open **System Settings -> Privacy & Security** and choose **Open Anyway**.
 
-When installing an update, quit ClipFlow completely before replacing the existing app in `Applications`, then launch the new copy. Automatic global quick paste requires ClipFlow to be enabled in **System Settings -> Privacy & Security -> Accessibility**.
+When installing an update, quit ClipFlow completely before replacing the existing app in `Applications`, then launch the new copy. If **Settings -> Permissions** still shows Automatic Paste as not granted, select **Rebind Current App**, enable ClipFlow in **System Settings -> Privacy & Security -> Accessibility**, then refresh the permission status.
 
 ## Build from Source
 
