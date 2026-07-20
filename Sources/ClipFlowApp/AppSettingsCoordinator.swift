@@ -30,7 +30,6 @@ final class AppSettingsCoordinator {
     private let updateShortcut: (HotKeyShortcut, HotKeyShortcut) throws -> Void
     private let updateStatusItem: (Bool) -> Void
     private let updateLanguage: (AppLanguage) -> Void
-    private let updatePanelOpacity: (Int) -> Void
 
     init(
         repository: ClipboardRepository,
@@ -39,8 +38,7 @@ final class AppSettingsCoordinator {
         retentionPolicyStore: AppRetentionPolicyStore,
         updateShortcut: @escaping (HotKeyShortcut, HotKeyShortcut) throws -> Void,
         updateStatusItem: @escaping (Bool) -> Void,
-        updateLanguage: @escaping (AppLanguage) -> Void,
-        updatePanelOpacity: @escaping (Int) -> Void = { _ in }
+        updateLanguage: @escaping (AppLanguage) -> Void
     ) {
         self.repository = repository
         self.pasteService = pasteService
@@ -49,7 +47,6 @@ final class AppSettingsCoordinator {
         self.updateShortcut = updateShortcut
         self.updateStatusItem = updateStatusItem
         self.updateLanguage = updateLanguage
-        self.updatePanelOpacity = updatePanelOpacity
     }
 
     func apply(
@@ -96,9 +93,6 @@ final class AppSettingsCoordinator {
                 "debug_logging_changed",
                 metadata: ["enabled": "\(current.debugLoggingEnabled)"]
             )
-        }
-        if changes.contains(.panelOpacity) {
-            updatePanelOpacity(current.mainPanelOpacityPercent)
         }
     }
 }

@@ -5,7 +5,7 @@ import Foundation
 import Observation
 
 public protocol HistoryRepository: Sendable {
-    func search(_ query: SearchQuery, limit: Int) throws -> [ClipboardItem]
+    func search(_ query: SearchQuery, limit: Int, offset: Int) throws -> [ClipboardItem]
     func markUsed(_ id: UUID) throws
     func setFavorite(_ favorite: Bool, for id: UUID) throws
     func rename(_ id: UUID, title: String?) throws
@@ -14,6 +14,22 @@ public protocol HistoryRepository: Sendable {
     func createCategory(name: String) throws -> ClipCategory
     func assign(itemID: UUID, categoryID: UUID) throws
     func deleteCategory(_ id: UUID) throws
+    func quickPasteSlots() throws -> [QuickPasteSlot]
+    func setQuickPasteSlot(_ index: Int, itemID: UUID) throws
+    func clearQuickPasteSlot(_ index: Int) throws
+    func pasteStackItems() throws -> [PasteStackItem]
+    func appendToPasteStack(itemID: UUID) throws
+    func removePasteStackItem(at position: Int) throws
+    func clearPasteStack() throws
+    func setTemporaryPolicy(for itemID: UUID, expiresAt: Date?, isOneTime: Bool) throws
+    func templates() throws -> [SnippetTemplate]
+    func createTemplate(title: String, body: String) throws -> SnippetTemplate
+}
+
+public extension HistoryRepository {
+    func search(_ query: SearchQuery, limit: Int) throws -> [ClipboardItem] {
+        try search(query, limit: limit, offset: 0)
+    }
 }
 
 extension ClipboardRepository: HistoryRepository {}
@@ -21,12 +37,21 @@ extension ClipboardRepository: HistoryRepository {}
 public protocol PasteServing: Sendable {
     func paste(item: ClipboardItem) async throws -> PasteOutcome
     func paste(item: ClipboardItem, mode: PasteMode) async throws -> PasteOutcome
+    func paste(text: String) async throws -> PasteOutcome
 }
 
 public extension PasteServing {
     func paste(item: ClipboardItem, mode: PasteMode) async throws -> PasteOutcome {
         try await paste(item: item)
     }
+
+    func paste(text: String) async throws -> PasteOutcome {
+        throw TemplatePasteError.unsupported
+    }
+}
+
+public enum TemplatePasteError: Error {
+    case unsupported
 }
 
 @MainActor
@@ -54,6 +79,10 @@ public final class AppModel {
     public private(set) var lastPasteOutcome: PasteOutcome?
     public private(set) var visuals: [UUID: ClipboardVisualDescriptor] = [:]
     public private(set) var pasteDestinationName: String?
+    public private(set) var quickPasteSlots: [QuickPasteSlot] = []
+    public private(set) var pasteStack: [PasteStackItem] = []
+    public private(set) var templates: [SnippetTemplate] = []
+    public private(set) var hasMoreItems = false
 
     @ObservationIgnored private let repository: any HistoryRepository
     @ObservationIgnored private let pasteService: any PasteServing
@@ -62,6 +91,7 @@ public final class AppModel {
     @ObservationIgnored private var thumbnailTasks: [UUID: Task<Void, Never>] = [:]
     @ObservationIgnored private var thumbnailRequestIDs: [UUID: UUID] = [:]
     @ObservationIgnored private var thumbnailPixelSizes: [UUID: Int] = [:]
+    @ObservationIgnored private let historyPageSize = 150
 
     public init(
         repository: any HistoryRepository,
@@ -98,12 +128,16 @@ public final class AppModel {
 
     public var availableContextActions: [ItemContextAction] {
         guard let selectedItem else { return [] }
-        return itemIntegrations?.availableContextActions(for: selectedItem)
-            ?? ItemContextAction.available(for: selectedItem.kind)
+        return contextActions(for: selectedItem)
     }
 
     public func applicationActions(for item: ClipboardItem) -> [ApplicationAction] {
         itemIntegrations?.availableActions(for: item) ?? []
+    }
+
+    public func contextActions(for item: ClipboardItem) -> [ItemContextAction] {
+        itemIntegrations?.availableContextActions(for: item)
+            ?? ItemContextAction.available(for: item.kind)
     }
 
     public func previewSelection() {
@@ -138,7 +172,9 @@ public final class AppModel {
             await pasteSelectionAsPlainText()
         case .quickLook:
             previewSelection()
-        case .openLink, .openFile, .revealInFinder:
+        case .copyOriginal, .copyPlainText, .copyMarkdownLink, .copyFilePath,
+             .copyCleanText, .copyFirstLine, .copyURLs,
+             .openLink, .openFile, .revealInFinder:
             guard let selectedItem, let itemIntegrations else {
                 errorMessage = L10n.string("error.contextAction")
                 return
@@ -163,8 +199,13 @@ public final class AppModel {
                 kind: selectedKind,
                 favoritesOnly: favoritesOnly
             )
-            let results = try repository.search(query, limit: 500)
+            let page = try repository.search(query, limit: historyPageSize + 1, offset: 0)
+            let results = Array(page.prefix(historyPageSize))
+            hasMoreItems = page.count > historyPageSize
             categories = try repository.allCategories()
+            quickPasteSlots = try repository.quickPasteSlots()
+            pasteStack = try repository.pasteStackItems()
+            templates = try repository.templates()
             let previousItems = Dictionary(uniqueKeysWithValues: items.map { ($0.id, $0) })
             let previousVisuals = visuals
             let unchangedItemIDs = Set<UUID>(results.compactMap { item in
@@ -204,6 +245,35 @@ public final class AppModel {
                 selectedItemID = results.first?.id
             }
             errorMessage = nil
+        } catch {
+            errorMessage = L10n.string("error.history.load")
+        }
+    }
+
+    public func loadMore() async {
+        guard hasMoreItems, !isLoading else { return }
+        isLoading = true
+        defer { isLoading = false }
+        do {
+            let query = SearchQuery(
+                text: searchText,
+                categoryID: selectedCategoryID,
+                kind: selectedKind,
+                favoritesOnly: favoritesOnly
+            )
+            let page = try repository.search(
+                query,
+                limit: historyPageSize + 1,
+                offset: items.count
+            )
+            let nextItems = Array(page.prefix(historyPageSize))
+            hasMoreItems = page.count > historyPageSize
+            items.append(contentsOf: nextItems)
+            if let visualService {
+                for item in nextItems {
+                    visuals[item.id] = visualService.metadataVisual(for: item)
+                }
+            }
         } catch {
             errorMessage = L10n.string("error.history.load")
         }
@@ -286,7 +356,7 @@ public final class AppModel {
 
         do {
             lastPasteOutcome = try await pasteService.paste(item: item)
-            try repository.markUsed(item.id)
+            try recordSuccessfulPaste(of: item)
             errorMessage = nil
             await reload()
         } catch {
@@ -299,7 +369,7 @@ public final class AppModel {
 
         do {
             lastPasteOutcome = try await pasteService.paste(item: item, mode: .plainText)
-            try repository.markUsed(item.id)
+            try recordSuccessfulPaste(of: item)
             errorMessage = nil
             await reload()
         } catch {
@@ -386,6 +456,124 @@ public final class AppModel {
         }
     }
 
+    public func setQuickPasteSlot(_ index: Int, itemID: UUID) async {
+        do {
+            try repository.setQuickPasteSlot(index, itemID: itemID)
+            quickPasteSlots = try repository.quickPasteSlots()
+            errorMessage = nil
+        } catch {
+            errorMessage = L10n.string("error.quickPaste")
+        }
+    }
+
+    public func clearQuickPasteSlot(_ index: Int) async {
+        do {
+            try repository.clearQuickPasteSlot(index)
+            quickPasteSlots = try repository.quickPasteSlots()
+            errorMessage = nil
+        } catch {
+            errorMessage = L10n.string("error.quickPaste")
+        }
+    }
+
+    public func addToPasteStack(_ itemID: UUID) async {
+        do {
+            try repository.appendToPasteStack(itemID: itemID)
+            pasteStack = try repository.pasteStackItems()
+            errorMessage = nil
+        } catch {
+            errorMessage = L10n.string("error.pasteStack")
+        }
+    }
+
+    public func removePasteStackItem(at position: Int) async {
+        do {
+            try repository.removePasteStackItem(at: position)
+            pasteStack = try repository.pasteStackItems()
+            errorMessage = nil
+        } catch {
+            errorMessage = L10n.string("error.pasteStack")
+        }
+    }
+
+    public func clearPasteStack() async {
+        do {
+            try repository.clearPasteStack()
+            pasteStack.removeAll()
+            errorMessage = nil
+        } catch {
+            errorMessage = L10n.string("error.pasteStack")
+        }
+    }
+
+    public func pasteNextStackItem() async {
+        guard let entry = pasteStack.first else { return }
+
+        do {
+            lastPasteOutcome = try await pasteService.paste(item: entry.item)
+            try recordSuccessfulPaste(of: entry.item)
+            try repository.removePasteStackItem(at: entry.position)
+            errorMessage = nil
+            await reload()
+        } catch {
+            errorMessage = L10n.string("error.paste")
+        }
+    }
+
+    public func setTemporaryPolicy(
+        for itemID: UUID,
+        expiresAt: Date?,
+        isOneTime: Bool
+    ) async {
+        do {
+            try repository.setTemporaryPolicy(
+                for: itemID,
+                expiresAt: expiresAt,
+                isOneTime: isOneTime
+            )
+            errorMessage = nil
+            await reload()
+        } catch {
+            errorMessage = L10n.string("error.temporary")
+        }
+    }
+
+    public func createTemplate(from item: ClipboardItem) async {
+        guard item.kind == .text || item.kind == .richText else { return }
+        do {
+            _ = try repository.createTemplate(title: item.displayTitle, body: item.searchText)
+            templates = try repository.templates()
+            errorMessage = nil
+        } catch {
+            errorMessage = L10n.string("error.template")
+        }
+    }
+
+    public func pasteTemplate(_ template: SnippetTemplate, values: [String: String]) async {
+        do {
+            let text = SnippetTemplateRenderer.render(template.body, values: values)
+            lastPasteOutcome = try await pasteService.paste(text: text)
+            errorMessage = nil
+        } catch {
+            errorMessage = L10n.string("error.paste")
+        }
+    }
+
+    public func pasteQuickSlot(_ index: Int) async {
+        guard let slot = quickPasteSlots.first(where: { $0.index == index }) else {
+            return
+        }
+
+        do {
+            lastPasteOutcome = try await pasteService.paste(item: slot.item)
+            try recordSuccessfulPaste(of: slot.item)
+            errorMessage = nil
+            await reload()
+        } catch {
+            errorMessage = L10n.string("error.paste")
+        }
+    }
+
     public func selectPrevious() {
         moveSelection(by: -1)
     }
@@ -404,5 +592,12 @@ public final class AppModel {
         } ?? 0
         let nextIndex = min(max(currentIndex + offset, 0), items.count - 1)
         selectedItemID = items[nextIndex].id
+    }
+
+    private func recordSuccessfulPaste(of item: ClipboardItem) throws {
+        try repository.markUsed(item.id)
+        if item.isOneTime {
+            try repository.delete(item.id)
+        }
     }
 }

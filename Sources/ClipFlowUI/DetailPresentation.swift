@@ -36,7 +36,16 @@ public enum DetailActionPresentation {
     public static func stackActions(
         from actions: [ItemContextAction]
     ) -> [ItemContextAction] {
-        actions.filter { $0 != .quickLook }
+        actions.filter { action in
+            switch action {
+            case .quickLook:
+                false
+            case .copyPlainText, .copyMarkdownLink, .copyFilePath:
+                true
+            default:
+                !action.isContentOperation
+            }
+        }
     }
 }
 

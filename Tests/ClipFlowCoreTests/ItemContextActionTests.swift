@@ -7,25 +7,34 @@ struct ItemContextActionTests {
     @Test("each clipboard kind exposes its exact content action matrix")
     func actionMatrix() {
         #expect(ItemContextAction.available(for: .text) == [
-            .pasteOriginal, .pastePlainText, .quickLook
+            .pasteOriginal, .pastePlainText,
+            .copyOriginal, .copyPlainText, .copyCleanText,
+            .copyFirstLine, .copyURLs, .quickLook
         ])
         #expect(ItemContextAction.available(for: .richText) == [
-            .pasteOriginal, .pastePlainText, .quickLook
+            .pasteOriginal, .pastePlainText,
+            .copyOriginal, .copyPlainText, .copyCleanText,
+            .copyFirstLine, .copyURLs, .quickLook
         ])
         #expect(ItemContextAction.available(for: .link) == [
-            .pasteOriginal, .openLink, .pastePlainText, .quickLook
+            .pasteOriginal, .openLink, .pastePlainText,
+            .copyOriginal, .copyPlainText, .copyMarkdownLink,
+            .copyCleanText, .copyFirstLine, .copyURLs, .quickLook
         ])
         #expect(ItemContextAction.available(for: .file) == [
-            .pasteOriginal, .pasteFilePath, .openFile, .revealInFinder, .quickLook
+            .pasteOriginal, .pasteFilePath, .openFile, .revealInFinder,
+            .copyOriginal, .copyFilePath, .quickLook
         ])
         #expect(ItemContextAction.available(for: .image) == [
-            .pasteOriginal, .quickLook
+            .pasteOriginal, .copyOriginal, .quickLook
         ])
         #expect(ItemContextAction.available(for: .mixed) == [
-            .pasteOriginal, .pastePlainText, .quickLook
+            .pasteOriginal, .pastePlainText,
+            .copyOriginal, .copyPlainText, .copyCleanText,
+            .copyFirstLine, .copyURLs, .quickLook
         ])
         #expect(ItemContextAction.available(for: .unknown) == [
-            .pasteOriginal, .quickLook
+            .pasteOriginal, .copyOriginal, .quickLook
         ])
     }
 
@@ -49,5 +58,10 @@ struct ItemContextActionTests {
             ItemContextAction.openLink.titleKey(for: .link) ==
                 "contextAction.openLink"
         )
+        #expect(ItemContextAction.copyPlainText.isContentOperation)
+        #expect(ItemContextAction.pastePlainText.symbolName == "doc.plaintext")
+        #expect(ItemContextAction.copyPlainText.symbolName == "doc.text")
+        #expect(ItemContextAction.copyMarkdownLink.isContentOperation)
+        #expect(!ItemContextAction.openFile.isContentOperation)
     }
 }

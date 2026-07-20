@@ -5,6 +5,7 @@ import ClipFlowSystem
 import ClipFlowUI
 import CryptoKit
 import SwiftUI
+import UniformTypeIdentifiers
 
 @main
 struct ClipFlowApp: App {
@@ -21,6 +22,7 @@ struct ClipFlowApp: App {
 final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var panelController: FloatingPanelController?
     private var hotKeyController: GlobalHotKeyController?
+    private var quickPasteHotKeyController: QuickPasteHotKeyController?
     private var monitor: PasteboardMonitor?
     private var pasteService: AppPasteService?
     private var settingsCoordinator: AppSettingsCoordinator?
@@ -31,6 +33,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var appModel: AppModel?
     private var inputStateStore: PanelInputStateStore?
     private var historyRepository: (any HistoryRepository)?
+    private var backupRepository: ClipboardRepository?
     private var captureProcessor: ClipboardCaptureProcessor?
     private var isRestoringRuntimeSettings = false
     private let loginItemService = LoginItemService()
@@ -209,8 +212,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                     )
                 }
             )
-            panelController.setOpacityPercent(settings.mainPanelOpacityPercent)
             let hotKeyController: GlobalHotKeyController?
+            let quickPasteHotKeyController: QuickPasteHotKeyController?
             if visualAcceptanceConfiguration == nil {
                 let controller = GlobalHotKeyController()
                 do {
@@ -223,8 +226,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                     )
                 }
                 hotKeyController = controller
+
+                let quickPasteController = QuickPasteHotKeyController()
+                do {
+                    try quickPasteController.register { [weak self] slotIndex in
+                        self?.pasteQuickSlotFromGlobalShortcut(slotIndex)
+                    }
+                    quickPasteHotKeyController = quickPasteController
+                } catch {
+                    quickPasteHotKeyController = nil
+                    Task {
+                        await logger.log(
+                            "quick_paste_shortcut_registration_failed",
+                            metadata: ["error": error.localizedDescription]
+                        )
+                    }
+                }
             } else {
                 hotKeyController = nil
+                quickPasteHotKeyController = nil
             }
 
             let pasteboardMonitor: PasteboardMonitor?
@@ -235,6 +255,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                     repository: repository,
                     model: model,
                     retentionPolicy: { retentionPolicyStore.current() },
+                    privacyPolicy: {
+                        await MainActor.run {
+                            settings.privacyCapturePolicy
+                        }
+                    },
+                    smartCategoryPolicy: {
+                        await MainActor.run {
+                            settings.smartCategoryPolicy
+                        }
+                    },
+                    textRecognizer: VisionTextRecognizer(),
                     log: { event, metadata in
                         await logger.log(event, metadata: metadata)
                     }
@@ -254,12 +285,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
             self.panelController = panelController
             self.hotKeyController = hotKeyController
+            self.quickPasteHotKeyController = quickPasteHotKeyController
             self.monitor = pasteboardMonitor
             self.pasteService = pasteService
             self.settingsModel = settings
             self.appModel = model
             self.inputStateStore = inputState
             self.historyRepository = repository
+            self.backupRepository = repository
             self.captureProcessor = captureProcessor
             self.logger = logger
             self.settingsCoordinator = AppSettingsCoordinator(
@@ -275,9 +308,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 },
                 updateLanguage: { [weak self] language in
                     self?.updateLanguage(language)
-                },
-                updatePanelOpacity: { [weak panelController] percent in
-                    panelController?.setOpacityPercent(percent)
                 }
             )
             updateStatusItem(enabled: settings.showStatusBarItem)
@@ -327,6 +357,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             Task { await monitor.stop() }
         }
         hotKeyController?.unregister()
+        quickPasteHotKeyController?.unregister()
     }
 
     func applicationDidBecomeActive(_ notification: Notification) {
@@ -343,7 +374,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
     }
 
-    private func capturePasteTarget() {
+    @discardableResult
+    private func capturePasteTarget() -> PasteTarget? {
         let application = NSWorkspace.shared.frontmostApplication
         let ownPID = ProcessInfo.processInfo.processIdentifier
         let target: PasteTarget? = if let application,
@@ -361,6 +393,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         appModel?.updatePasteDestination(
             name: target == nil ? nil : application?.localizedName
         )
+        return target
+    }
+
+    private func pasteQuickSlotFromGlobalShortcut(_ index: Int) {
+        guard let appModel else { return }
+        if panelController?.window?.isVisible == true {
+            Task { await appModel.pasteQuickSlot(index) }
+            return
+        }
+
+        let target = capturePasteTarget()
+        guard let pasteService else { return }
+        Task {
+            await pasteService.setTarget(target)
+            await appModel.pasteQuickSlot(index)
+        }
     }
 
     private func handlePanelCommand(
@@ -392,6 +440,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                     await model.pasteSelectionAsPlainText()
                 }
             }
+        case let .pasteQuickSlot(index):
+            guard !browserModel.isShowing else { return }
+            Task { await model.pasteQuickSlot(index) }
         case .clearSearch:
             inputState.searchText = ""
             if browserModel.isShowing {
@@ -712,6 +763,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                             }
                         }
                     }
+                },
+                exportEncryptedBackup: { [weak self] in
+                    self?.exportEncryptedBackup()
+                },
+                importEncryptedBackup: { [weak self] in
+                    self?.importEncryptedBackup()
                 }
             )
         )
@@ -748,6 +805,133 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let directory = base.appendingPathComponent(directoryName, isDirectory: true)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         return directory
+    }
+
+    private func exportEncryptedBackup() {
+        guard let backupRepository else { return }
+        guard let password = promptForBackupPassword(
+            message: L10n.string("settings.backup.password.message")
+        ) else {
+            return
+        }
+
+        let panel = NSSavePanel()
+        panel.title = L10n.string("settings.backup.export")
+        panel.nameFieldStringValue = L10n.string("settings.backup.fileName")
+        panel.allowedContentTypes = [Self.backupContentType]
+        panel.canCreateDirectories = true
+        guard panel.runModal() == .OK, let url = panel.url else {
+            return
+        }
+
+        Task.detached {
+            do {
+                let data = try backupRepository.exportEncryptedBackup(password: password)
+                try data.write(to: url, options: [.atomic, .completeFileProtectionUnlessOpen])
+                await MainActor.run {
+                    Self.showBackupAlert(
+                        title: L10n.string("settings.backup.export"),
+                        message: L10n.format("settings.backup.export.success", url.lastPathComponent)
+                    )
+                }
+            } catch {
+                await MainActor.run {
+                    Self.showBackupAlert(
+                        title: L10n.string("settings.backup.export"),
+                        message: error.localizedDescription
+                    )
+                }
+            }
+        }
+    }
+
+    private func importEncryptedBackup() {
+        guard let backupRepository else { return }
+        let panel = NSOpenPanel()
+        panel.title = L10n.string("settings.backup.import")
+        panel.allowedContentTypes = [Self.backupContentType]
+        panel.allowsMultipleSelection = false
+        panel.canChooseDirectories = false
+        guard panel.runModal() == .OK, let url = panel.url else {
+            return
+        }
+        guard let password = promptForBackupPassword(
+            message: L10n.string("settings.backup.password.message")
+        ) else {
+            return
+        }
+
+        guard let size = try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize,
+              size <= ClipboardBackupImportLimits.maximumArchiveBytes else {
+            Self.showBackupAlert(
+                title: L10n.string("settings.backup.import"),
+                message: ClipboardBackupError.resourceLimitExceeded.localizedDescription
+            )
+            return
+        }
+
+        let appModel = self.appModel
+        Task.detached {
+            do {
+                let data = try Data(contentsOf: url)
+                let result = try backupRepository.importEncryptedBackup(data, password: password)
+                await appModel?.reload()
+                await MainActor.run {
+                    Self.showBackupAlert(
+                        title: L10n.string("settings.backup.import"),
+                        message: L10n.format(
+                            "settings.backup.import.success",
+                            result.insertedItemCount,
+                            result.mergedItemCount
+                        )
+                    )
+                }
+            } catch {
+                await MainActor.run {
+                    Self.showBackupAlert(
+                        title: L10n.string("settings.backup.import"),
+                        message: error.localizedDescription
+                    )
+                }
+            }
+        }
+    }
+
+    private func promptForBackupPassword(message: String) -> String? {
+        while true {
+            let field = NSSecureTextField(frame: NSRect(x: 0, y: 0, width: 280, height: 24))
+            field.placeholderString = L10n.string("settings.backup.password.placeholder")
+            let alert = NSAlert()
+            alert.messageText = L10n.string("settings.backup.password.title")
+            alert.informativeText = message
+            alert.accessoryView = field
+            alert.addButton(withTitle: L10n.string("common.continue"))
+            alert.addButton(withTitle: L10n.string("common.cancel"))
+            guard alert.runModal() == .alertFirstButtonReturn else {
+                return nil
+            }
+            let password = field.stringValue
+            if !password.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                return password
+            }
+            Self.showBackupAlert(
+                title: L10n.string("settings.backup.password.title"),
+                message: L10n.string("settings.backup.password.empty")
+            )
+        }
+    }
+
+    private static func showBackupAlert(title: String, message: String) {
+        let alert = NSAlert()
+        alert.messageText = title
+        alert.informativeText = message
+        alert.addButton(withTitle: L10n.string("common.ok"))
+        alert.runModal()
+    }
+
+    private static var backupContentType: UTType {
+        UTType(filenameExtension: "clipflowbackup")
+            ?? UTType(exportedAs: "app.clipflow.backup")
     }
 
     private static func databaseKey(applicationSupport: URL) throws -> Data {
@@ -867,12 +1051,16 @@ private struct SettingsWindowRootView: View {
         AppSettingsRuntimeSnapshot,
         AppSettingsRuntimeSnapshot
     ) -> Void
+    let exportEncryptedBackup: () -> Void
+    let importEncryptedBackup: () -> Void
 
     var body: some View {
         SettingsView(
             model: model,
             loginItemService: loginItemService,
-            onRuntimeSettingsChange: onRuntimeSettingsChange
+            onRuntimeSettingsChange: onRuntimeSettingsChange,
+            exportEncryptedBackup: exportEncryptedBackup,
+            importEncryptedBackup: importEncryptedBackup
         )
             .preferredColorScheme(model.appearanceMode.colorScheme)
             .id(model.appLanguage)

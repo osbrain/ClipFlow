@@ -5,6 +5,7 @@ public enum PanelCommand: Equatable, Sendable {
     case escape
     case moveUp
     case moveDown
+    case quickPaste(Int)
 }
 
 public enum PanelCommandAction: Equatable, Sendable {
@@ -16,6 +17,7 @@ public enum PanelCommandAction: Equatable, Sendable {
     case dismissPanel
     case selectPrevious
     case selectNext
+    case pasteQuickSlot(Int)
 }
 
 public enum PanelCommandFocus: Equatable, Sendable {
@@ -53,6 +55,8 @@ public struct PanelCommandRouter: Sendable {
         }
 
         switch command {
+        case let .quickPaste(index):
+            return .pasteQuickSlot(index)
         case .escape:
             return context.hasSearchText ? .clearSearch : .dismissPanel
         case .space, .returnKey, .commandReturn, .moveUp, .moveDown:
@@ -63,7 +67,7 @@ public struct PanelCommandRouter: Sendable {
             case .commandReturn: return .pasteSelectionAsPlainText
             case .moveUp: return .selectPrevious
             case .moveDown: return .selectNext
-            case .escape: return .passThrough
+            case .escape, .quickPaste: return .passThrough
             }
         }
     }

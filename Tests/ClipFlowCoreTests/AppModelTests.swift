@@ -56,7 +56,7 @@ struct AppModelTests {
         #expect(repository.lastQuery?.categoryID == categoryID)
         #expect(repository.lastQuery?.kind == .image)
         #expect(repository.lastQuery?.favoritesOnly == true)
-        #expect(repository.lastLimit == 500)
+        #expect(repository.lastLimit == 151)
     }
 
     @Test("applying a history filter clears mutually exclusive repository values")
@@ -102,6 +102,20 @@ struct AppModelTests {
         #expect(await pasteService.pasteRequests == [
             FakePasteRequest(itemID: item.id, mode: .plainText)
         ])
+    }
+
+    @Test("one-time clips are deleted only after a successful paste")
+    func oneTimeClipDeletesAfterPaste() async {
+        let item = Self.item(preview: "One-time", isOneTime: true)
+        let repository = FakeHistoryRepository(items: [item])
+        let pasteService = FakePasteService()
+        let model = AppModel(repository: repository, pasteService: pasteService)
+        await model.reload()
+
+        await model.pasteSelection()
+
+        #expect(await pasteService.pastedIDs == [item.id])
+        #expect(repository.deletedIDs == [item.id])
     }
 
     @Test("favorite rename and delete actions update the repository")
@@ -171,6 +185,115 @@ struct AppModelTests {
         #expect(repository.deletedCategoryIDs == [category!.id])
     }
 
+    @Test("quick paste slots load assign clear and paste by slot")
+    func quickPasteSlotsLoadAssignClearAndPaste() async {
+        let first = Self.item(preview: "First")
+        let second = Self.item(preview: "Second")
+        let repository = FakeHistoryRepository(items: [first, second])
+        let pasteService = FakePasteService()
+        let model = AppModel(repository: repository, pasteService: pasteService)
+
+        await model.reload()
+        await model.setQuickPasteSlot(1, itemID: first.id)
+        await model.setQuickPasteSlot(1, itemID: second.id)
+
+        #expect(model.quickPasteSlots.map(\.index) == [1])
+        #expect(model.quickPasteSlots.first?.item.id == second.id)
+
+        await model.pasteQuickSlot(1)
+        #expect(await pasteService.pastedIDs == [second.id])
+        #expect(repository.markedUsed == [second.id])
+
+        await model.clearQuickPasteSlot(1)
+        #expect(model.quickPasteSlots.isEmpty)
+    }
+
+    @Test("paste stack adds selected history and pastes the next item in order")
+    func pasteStackAddsAndPastesInOrder() async {
+        let first = Self.item(preview: "First")
+        let second = Self.item(preview: "Second")
+        let repository = FakeHistoryRepository(items: [first, second])
+        let pasteService = FakePasteService()
+        let model = AppModel(repository: repository, pasteService: pasteService)
+
+        await model.reload()
+        await model.addToPasteStack(first.id)
+        await model.addToPasteStack(second.id)
+
+        #expect(model.pasteStack.map(\.item.id) == [first.id, second.id])
+
+        await model.pasteNextStackItem()
+
+        #expect(await pasteService.pastedIDs == [first.id])
+        #expect(model.pasteStack.map(\.item.id) == [second.id])
+        #expect(repository.markedUsed == [first.id])
+    }
+
+    @Test("main panel exposes quick paste strip and command shortcuts")
+    func mainPanelExposesQuickPasteStrip() throws {
+        let sourceURL = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .appendingPathComponent("Sources/ClipFlowUI/MainPanelView.swift")
+        let source = try String(contentsOf: sourceURL, encoding: .utf8)
+
+        #expect(source.contains("QuickPasteSlotStrip"))
+        #expect(!source.contains(".keyboardShortcut(shortcut(for: index), modifiers: [.command, .option])"))
+        #expect(source.contains("quickPaste.pinToSlot"))
+        #expect(source.contains("pinSelectionToSlot"))
+        #expect(source.contains("quickPaste.add"))
+        #expect(source.contains("quickPaste.emptyDescription"))
+        #expect(source.contains("QuickPasteEmptyStateIcon"))
+        #expect(source.contains("quickPaste.shortcutHint"))
+        #expect(!source.contains("ClipFlowMiniEmptyStateIllustration(symbol: \"pin\")"))
+        #expect(source.contains("ForEach(slots)"))
+        #expect(!source.contains("slot?.item.displayTitle ?? L10n.string(\"quickPaste.empty\")"))
+    }
+
+    @Test("main panel exposes a compact sequential paste stack")
+    func mainPanelExposesPasteStack() throws {
+        let sourceURL = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .appendingPathComponent("Sources/ClipFlowUI/MainPanelView.swift")
+        let source = try String(contentsOf: sourceURL, encoding: .utf8)
+
+        #expect(source.contains("PasteStackStrip"))
+        #expect(source.contains("pasteStack.add"))
+        #expect(source.contains("pasteNextStackItem"))
+        #expect(source.contains("pasteStack.clear"))
+    }
+
+    @Test("main panel groups copy and transform actions under content operations")
+    func mainPanelGroupsContentOperations() throws {
+        let sourceURL = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .appendingPathComponent("Sources/ClipFlowUI/MainPanelView.swift")
+        let source = try String(contentsOf: sourceURL, encoding: .utf8)
+
+        #expect(source.contains("contextAction.contentOperations"))
+        #expect(source.contains("isContentOperation"))
+    }
+
+    @Test("history context menu uses icon labels for primary actions")
+    func historyContextMenuUsesIconLabels() throws {
+        let sourceURL = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .appendingPathComponent("Sources/ClipFlowUI/MainPanelView.swift")
+        let source = try String(contentsOf: sourceURL, encoding: .utf8)
+
+        #expect(source.contains("Label(L10n.string(\"detail.paste\"), systemImage: \"clipboard\")"))
+        #expect(source.contains("Label(L10n.string(\"detail.preview\"), systemImage: \"eye\")"))
+        #expect(source.contains("Label(L10n.string(\"action.rename\"), systemImage: \"pencil\")"))
+        #expect(source.contains("Label(L10n.string(\"action.delete\"), systemImage: \"trash\")"))
+    }
+
     @Test("routes preview and optional application actions for the selection")
     func routesSelectionIntegrations() async {
         let item = Self.item(preview: "Send this")
@@ -218,6 +341,29 @@ struct AppModelTests {
         await model.performContextAction(.openLink)
         #expect(model.errorMessage == L10n.string("error.contextAction"))
         #expect(model.selectedItemID == item.id)
+    }
+
+    @Test("routes content copy actions through integrations without pasting")
+    func routesContentCopyActionsThroughIntegrations() async {
+        let item = Self.item(preview: "Copy me")
+        let repository = FakeHistoryRepository(items: [item])
+        let pasteService = FakePasteService()
+        let integrations = FakeItemIntegrationService()
+        integrations.contextActions = [.copyOriginal, .copyPlainText, .copyCleanText]
+        let model = AppModel(
+            repository: repository,
+            pasteService: pasteService,
+            itemIntegrations: integrations
+        )
+        await model.reload()
+
+        await model.performContextAction(.copyCleanText)
+
+        #expect(integrations.performedContextActions == [
+            PerformedContextAction(action: .copyCleanText, itemID: item.id)
+        ])
+        #expect(await pasteService.pasteRequests.isEmpty)
+        #expect(repository.markedUsed.isEmpty)
     }
 
     @Test("reload publishes metadata visuals without loading thumbnails")
@@ -411,7 +557,8 @@ struct AppModelTests {
         kind: ClipboardKind = .text,
         updatedAt: Date = .distantPast,
         appName: String = "Notes",
-        bundleID: String? = "com.apple.Notes"
+        bundleID: String? = "com.apple.Notes",
+        isOneTime: Bool = false
     ) -> ClipboardItem {
         ClipboardItem(
             id: id, createdAt: .distantPast, updatedAt: updatedAt,
@@ -419,7 +566,8 @@ struct AppModelTests {
             previewText: preview, searchText: preview.lowercased(),
             byteSize: preview.utf8.count, contentHash: preview,
             isFavorite: false, lastUsedAt: nil, customTitle: nil,
-            hasExternalPayload: false
+            hasExternalPayload: false,
+            isOneTime: isOneTime
         )
     }
 
@@ -441,6 +589,8 @@ private final class FakeHistoryRepository: HistoryRepository, @unchecked Sendabl
     private var storedCategories: [ClipCategory] = []
     private var storedAssignments: [(UUID, UUID)] = []
     private var categoryDeletions: [UUID] = []
+    private var storedQuickSlots: [Int: UUID] = [:]
+    private var storedPasteStack: [(position: Int, itemID: UUID)] = []
 
     init(items: [ClipboardItem]) { self.items = items }
 
@@ -458,7 +608,7 @@ private final class FakeHistoryRepository: HistoryRepository, @unchecked Sendabl
         lock.withLock { self.items = items }
     }
 
-    func search(_ query: SearchQuery, limit: Int) throws -> [ClipboardItem] {
+    func search(_ query: SearchQuery, limit: Int, offset: Int) throws -> [ClipboardItem] {
         lock.withLock {
             self.query = query
             self.limit = limit
@@ -467,10 +617,10 @@ private final class FakeHistoryRepository: HistoryRepository, @unchecked Sendabl
         return lock.withLock {
             items.filter {
                 query.score(ItemSearchDocument(
-                    id: $0.id, title: $0.displayTitle, body: $0.searchText,
+                    id: $0.id, title: $0.displayTitle, body: $0.searchableText,
                     appName: $0.appName, isFavorite: $0.isFavorite, kind: $0.kind
                 )) != nil
-            }.prefix(limit).map { $0 }
+            }.dropFirst(offset).prefix(limit).map { $0 }
         }
     }
 
@@ -514,6 +664,65 @@ private final class FakeHistoryRepository: HistoryRepository, @unchecked Sendabl
             categoryDeletions.append(id)
             storedCategories.removeAll { $0.id == id }
         }
+    }
+
+    func quickPasteSlots() throws -> [QuickPasteSlot] {
+        lock.withLock {
+            storedQuickSlots
+                .sorted { $0.key < $1.key }
+                .compactMap { index, itemID in
+                    items.first { $0.id == itemID }.map {
+                        QuickPasteSlot(index: index, item: $0)
+                    }
+                }
+        }
+    }
+
+    func setQuickPasteSlot(_ index: Int, itemID: UUID) throws {
+        lock.withLock {
+            storedQuickSlots[index] = itemID
+        }
+    }
+
+    func clearQuickPasteSlot(_ index: Int) throws {
+        lock.withLock {
+            storedQuickSlots[index] = nil
+        }
+    }
+
+    func pasteStackItems() throws -> [PasteStackItem] {
+        lock.withLock {
+            storedPasteStack.compactMap { entry in
+                items.first { $0.id == entry.itemID }.map {
+                    PasteStackItem(position: entry.position, item: $0)
+                }
+            }
+        }
+    }
+
+    func appendToPasteStack(itemID: UUID) throws {
+        lock.withLock {
+            let nextPosition = (storedPasteStack.last?.position ?? 0) + 1
+            storedPasteStack.append((position: nextPosition, itemID: itemID))
+        }
+    }
+
+    func removePasteStackItem(at position: Int) throws {
+        lock.withLock {
+            storedPasteStack.removeAll { $0.position == position }
+        }
+    }
+
+    func clearPasteStack() throws {
+        lock.withLock {
+            storedPasteStack.removeAll()
+        }
+    }
+
+    func setTemporaryPolicy(for itemID: UUID, expiresAt: Date?, isOneTime: Bool) throws {}
+    func templates() throws -> [SnippetTemplate] { [] }
+    func createTemplate(title: String, body: String) throws -> SnippetTemplate {
+        SnippetTemplate(id: UUID(), title: title, body: body, createdAt: Date(), updatedAt: Date())
     }
 }
 

@@ -83,7 +83,10 @@ public final class ClipboardRepository: @unchecked Sendable {
                     isFavorite: existing.isFavorite,
                     lastUsedAt: existing.lastUsedAt,
                     customTitle: existing.customTitle,
-                    hasExternalPayload: existing.hasExternalPayload
+                    hasExternalPayload: existing.hasExternalPayload,
+                    recognizedText: existing.recognizedText,
+                    expiresAt: existing.expiresAt,
+                    isOneTime: existing.isOneTime
                 ),
                 disposition: .refreshed
             )
@@ -192,8 +195,10 @@ public final class ClipboardRepository: @unchecked Sendable {
 
     public func search(
         _ query: SearchQuery,
-        limit: Int = .max
+        limit: Int = .max,
+        offset: Int = 0
     ) throws -> [ClipboardItem] {
+        try purgeExpiredTemporaryItems()
         let requestedLimit = max(1, limit)
         var conditions: [String] = []
         var bindings: [SQLValue] = []
@@ -220,8 +225,9 @@ public final class ClipboardRepository: @unchecked Sendable {
         sql += " ORDER BY COALESCE(last_used_at, updated_at) DESC, updated_at DESC"
         if query.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
            requestedLimit != .max {
-            sql += " LIMIT ?"
+            sql += " LIMIT ? OFFSET ?"
             bindings.append(.integer(Int64(requestedLimit)))
+            bindings.append(.integer(Int64(max(0, offset))))
         }
         sql += ";"
 
@@ -233,7 +239,7 @@ public final class ClipboardRepository: @unchecked Sendable {
             let document = ItemSearchDocument(
                 id: item.id,
                 title: item.displayTitle,
-                body: item.searchText,
+                body: item.searchableText,
                 appName: item.appName,
                 isFavorite: item.isFavorite,
                 categoryIDs: categoryIDsByItemID[item.id, default: []],
@@ -247,7 +253,7 @@ public final class ClipboardRepository: @unchecked Sendable {
         return ranked.sorted {
             if $0.score != $1.score { return $0.score < $1.score }
             return $0.item.updatedAt > $1.item.updatedAt
-        }.prefix(requestedLimit).map(\.item)
+        }.dropFirst(max(0, offset)).prefix(requestedLimit).map(\.item)
     }
 
     public func payloads(for itemID: UUID) throws -> [RepositoryPayload] {
@@ -414,6 +420,160 @@ public final class ClipboardRepository: @unchecked Sendable {
         )
     }
 
+    public func quickPasteSlots() throws -> [QuickPasteSlot] {
+        let rows = try database.query(
+            "SELECT slot_index, item_id FROM quick_paste_slots ORDER BY slot_index;"
+        )
+        return try rows.compactMap { row in
+            guard let slotIndex = row.integer("slot_index"),
+                  let itemID = row.uuid("item_id"),
+                  let item = try item(id: itemID) else {
+                return nil
+            }
+            return QuickPasteSlot(index: Int(slotIndex), item: item)
+        }
+    }
+
+    public func setQuickPasteSlot(_ index: Int, itemID: UUID) throws {
+        guard (1...9).contains(index) else {
+            throw SQLCipherDatabaseError.integrityFailed(
+                "Quick paste slot index must be between 1 and 9"
+            )
+        }
+        let now = Date().timeIntervalSince1970
+        try database.execute(
+            """
+            INSERT INTO quick_paste_slots(slot_index, item_id, created_at, updated_at)
+            VALUES (?, ?, ?, ?)
+            ON CONFLICT(slot_index) DO UPDATE SET
+                item_id=excluded.item_id,
+                updated_at=excluded.updated_at;
+            """,
+            bindings: [
+                .integer(Int64(index)),
+                .text(itemID.uuidString),
+                .real(now),
+                .real(now)
+            ]
+        )
+    }
+
+    public func clearQuickPasteSlot(_ index: Int) throws {
+        try database.execute(
+            "DELETE FROM quick_paste_slots WHERE slot_index = ?;",
+            bindings: [.integer(Int64(index))]
+        )
+    }
+
+    public func pasteStackItems() throws -> [PasteStackItem] {
+        try database.query(
+            """
+            SELECT psi.position AS stack_position, ci.*
+            FROM paste_stack_items psi
+            JOIN clipboard_items ci ON ci.id = psi.item_id
+            ORDER BY psi.position;
+            """
+        ).compactMap { row in
+            guard let position = row.integer("stack_position"),
+                  let item = Self.decodeItem(row) else {
+                return nil
+            }
+            return PasteStackItem(position: Int(position), item: item)
+        }
+    }
+
+    public func appendToPasteStack(itemID: UUID) throws {
+        try database.execute(
+            "INSERT INTO paste_stack_items(item_id, created_at) VALUES (?, ?);",
+            bindings: [.text(itemID.uuidString), .real(Date().timeIntervalSince1970)]
+        )
+    }
+
+    public func removePasteStackItem(at position: Int) throws {
+        try database.execute(
+            "DELETE FROM paste_stack_items WHERE position = ?;",
+            bindings: [.integer(Int64(position))]
+        )
+    }
+
+    public func clearPasteStack() throws {
+        try database.execute("DELETE FROM paste_stack_items;")
+    }
+
+    public func templates() throws -> [SnippetTemplate] {
+        try database.query(
+            "SELECT id, title, body, created_at, updated_at FROM snippet_templates ORDER BY updated_at DESC;"
+        ).compactMap { row in
+            guard let id = row.uuid("id"),
+                  let title = row.string("title"),
+                  let body = row.string("body"),
+                  let createdAt = row.date("created_at"),
+                  let updatedAt = row.date("updated_at") else {
+                return nil
+            }
+            return SnippetTemplate(
+                id: id, title: title, body: body, createdAt: createdAt, updatedAt: updatedAt
+            )
+        }
+    }
+
+    @discardableResult
+    public func createTemplate(title: String, body: String) throws -> SnippetTemplate {
+        let normalizedTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        let normalizedBody = body.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !normalizedTitle.isEmpty, !normalizedBody.isEmpty else {
+            throw SQLCipherDatabaseError.integrityFailed("Template title and body cannot be empty")
+        }
+        let now = Date()
+        let template = SnippetTemplate(
+            id: UUID(), title: normalizedTitle, body: normalizedBody, createdAt: now, updatedAt: now
+        )
+        try database.execute(
+            "INSERT INTO snippet_templates(id, title, body, created_at, updated_at) VALUES (?, ?, ?, ?, ?);",
+            bindings: [
+                .text(template.id.uuidString), .text(template.title), .text(template.body),
+                .real(now.timeIntervalSince1970), .real(now.timeIntervalSince1970)
+            ]
+        )
+        return template
+    }
+
+    public func updateRecognizedText(_ text: String, for itemID: UUID) throws {
+        let normalized = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        try database.execute(
+            "UPDATE clipboard_items SET ocr_text = ? WHERE id = ?;",
+            bindings: [
+                normalized.isEmpty ? .null : .text(normalized),
+                .text(itemID.uuidString)
+            ]
+        )
+    }
+
+    public func setTemporaryPolicy(
+        for itemID: UUID,
+        expiresAt: Date?,
+        isOneTime: Bool
+    ) throws {
+        try database.execute(
+            "UPDATE clipboard_items SET expires_at = ?, is_one_time = ? WHERE id = ?;",
+            bindings: [
+                expiresAt.map { .real($0.timeIntervalSince1970) } ?? .null,
+                .integer(isOneTime ? 1 : 0),
+                .text(itemID.uuidString)
+            ]
+        )
+    }
+
+    private func purgeExpiredTemporaryItems(now: Date = Date()) throws {
+        let expiredIDs = try database.query(
+            "SELECT id FROM clipboard_items WHERE expires_at IS NOT NULL AND expires_at <= ?;",
+            bindings: [.real(now.timeIntervalSince1970)]
+        ).compactMap { $0.uuid("id") }
+        for id in expiredIDs {
+            try delete(id)
+        }
+    }
+
     public func categories(for itemID: UUID) throws -> [ClipCategory] {
         try database.query(
             """
@@ -453,7 +613,7 @@ public final class ClipboardRepository: @unchecked Sendable {
     ) throws -> Int {
         let items = try database.query(
             Self.itemSelect + " ORDER BY created_at, id;"
-        ).compactMap(Self.decodeItem)
+        ).compactMap(Self.decodeItem).filter { !$0.isOneTime && $0.expiresAt == nil }
         var updatedCount = 0
 
         for item in items {
@@ -519,7 +679,7 @@ public final class ClipboardRepository: @unchecked Sendable {
     private static let itemSelect = """
         SELECT id, created_at, updated_at, app_name, bundle_id, kind,
                preview_text, search_text, byte_size, content_hash,
-               is_favorite, last_used_at, custom_title,
+               is_favorite, last_used_at, custom_title, ocr_text, expires_at, is_one_time,
                EXISTS(SELECT 1 FROM pasteboard_payloads p
                       WHERE p.item_id = clipboard_items.id AND p.external_file_name IS NOT NULL)
                    AS has_external_payload
@@ -540,9 +700,334 @@ public final class ClipboardRepository: @unchecked Sendable {
             previewText: preview, searchText: search, byteSize: Int(byteSize),
             contentHash: hash, isFavorite: row.bool("is_favorite") ?? false,
             lastUsedAt: row.date("last_used_at"), customTitle: row.string("custom_title"),
-            hasExternalPayload: row.bool("has_external_payload") ?? false
+            hasExternalPayload: row.bool("has_external_payload") ?? false,
+            recognizedText: row.string("ocr_text"),
+            expiresAt: row.date("expires_at"),
+            isOneTime: row.bool("is_one_time") ?? false
         )
     }
+}
+
+public extension ClipboardRepository {
+    func exportEncryptedBackup(password: String) throws -> Data {
+        let items = try database.query(
+            Self.itemSelect + " ORDER BY created_at, id;"
+        ).compactMap(Self.decodeItem)
+        let backupItems = try items.map { item in
+            ClipboardBackupItem(
+                id: item.id,
+                createdAt: item.createdAt,
+                updatedAt: item.updatedAt,
+                appName: item.appName,
+                bundleID: item.bundleID,
+                kind: item.kind,
+                previewText: item.previewText,
+                searchText: item.searchText,
+                byteSize: item.byteSize,
+                contentHash: item.contentHash,
+                isFavorite: item.isFavorite,
+                lastUsedAt: item.lastUsedAt,
+                customTitle: item.customTitle,
+                recognizedText: item.recognizedText,
+                payloads: try payloads(for: item.id).map {
+                    ClipboardBackupPayload(
+                        itemIndex: $0.itemIndex,
+                        type: $0.type,
+                        data: $0.data
+                    )
+                }
+            )
+        }
+        let categories = try allCategories().map {
+            ClipboardBackupCategory(
+                id: $0.id,
+                name: $0.name,
+                createdAt: $0.createdAt,
+                sortOrder: $0.sortOrder
+            )
+        }
+        let itemCategories = try itemCategoryPairs().map {
+            ClipboardBackupItemCategory(itemID: $0.itemID, categoryID: $0.categoryID)
+        }
+        let slots = try quickPasteSlots().map {
+            ClipboardBackupQuickPasteSlot(index: $0.index, itemID: $0.item.id)
+        }
+        let document = ClipboardBackupDocument(
+            version: EncryptedBackupCodec.currentVersion,
+            exportedAt: Date(),
+            items: backupItems,
+            categories: categories,
+            itemCategories: itemCategories,
+            quickPasteSlots: slots
+        )
+        return try EncryptedBackupCodec.seal(document, password: password)
+    }
+
+    @discardableResult
+    func importEncryptedBackup(
+        _ data: Data,
+        password: String
+    ) throws -> ClipboardBackupImportResult {
+        let document = try EncryptedBackupCodec.open(data, password: password)
+        let existingItems = try itemsByContentHash()
+        let existingCategories = try categoriesByName()
+        let thresholdBytes = configurationLock.withLock {
+            configuredExternalThresholdBytes
+        }
+        var occupiedQuickPasteSlots = Set(try quickPasteSlots().map(\.index))
+
+        var preparedItems: [PreparedBackupItem] = []
+        var newReferences: [ExternalPayloadReference] = []
+        do {
+            for backupItem in document.items where existingItems[backupItem.contentHash] == nil {
+                var preparedPayloads: [PreparedBackupPayload] = []
+                for payload in backupItem.payloads {
+                    if payload.data.count >= thresholdBytes {
+                        let reference = try externalPayloadStore.write(payload.data, id: UUID())
+                        newReferences.append(reference)
+                        preparedPayloads.append(
+                            PreparedBackupPayload(
+                                payload: payload,
+                                inlineData: nil,
+                                reference: reference
+                            )
+                        )
+                    } else {
+                        preparedPayloads.append(
+                            PreparedBackupPayload(
+                                payload: payload,
+                                inlineData: payload.data,
+                                reference: nil
+                            )
+                        )
+                    }
+                }
+                preparedItems.append(
+                    PreparedBackupItem(item: backupItem, payloads: preparedPayloads)
+                )
+            }
+
+            var insertedItemCount = 0
+            var mergedItemCount = 0
+            var createdCategoryCount = 0
+            var restoredQuickPasteSlotCount = 0
+            try database.transaction { database in
+                var targetItemIDsByBackupID: [UUID: UUID] = [:]
+                var targetCategoryIDsByBackupID: [UUID: UUID] = [:]
+                var categoryNames = existingCategories
+
+                for item in document.items {
+                    if let existing = existingItems[item.contentHash] {
+                        targetItemIDsByBackupID[item.id] = existing.id
+                        try mergeMetadata(from: item, into: existing.id, database: database)
+                        mergedItemCount += 1
+                    }
+                }
+
+                for prepared in preparedItems {
+                    let item = prepared.item
+                    try insertImportedItem(prepared, database: database)
+                    targetItemIDsByBackupID[item.id] = item.id
+                    insertedItemCount += 1
+                }
+
+                for category in document.categories {
+                    if let existingID = categoryNames[category.name] {
+                        targetCategoryIDsByBackupID[category.id] = existingID
+                    } else {
+                        try database.execute(
+                            """
+                            INSERT INTO clip_categories(id, name, created_at, sort_order)
+                            VALUES (?, ?, ?, ?);
+                            """,
+                            bindings: [
+                                .text(category.id.uuidString),
+                                .text(category.name),
+                                .real(category.createdAt.timeIntervalSince1970),
+                                .integer(Int64(category.sortOrder))
+                            ]
+                        )
+                        categoryNames[category.name] = category.id
+                        targetCategoryIDsByBackupID[category.id] = category.id
+                        createdCategoryCount += 1
+                    }
+                }
+
+                for link in document.itemCategories {
+                    guard let itemID = targetItemIDsByBackupID[link.itemID],
+                          let categoryID = targetCategoryIDsByBackupID[link.categoryID] else {
+                        continue
+                    }
+                    try database.execute(
+                        """
+                        INSERT OR IGNORE INTO item_categories(item_id, category_id, created_at)
+                        VALUES (?, ?, ?);
+                        """,
+                        bindings: [
+                            .text(itemID.uuidString),
+                            .text(categoryID.uuidString),
+                            .real(Date().timeIntervalSince1970)
+                        ]
+                    )
+                }
+
+                for slot in document.quickPasteSlots {
+                    guard (1...9).contains(slot.index),
+                          !occupiedQuickPasteSlots.contains(slot.index),
+                          let itemID = targetItemIDsByBackupID[slot.itemID] else {
+                        continue
+                    }
+                    let now = Date().timeIntervalSince1970
+                    try database.execute(
+                        """
+                        INSERT INTO quick_paste_slots(slot_index, item_id, created_at, updated_at)
+                        VALUES (?, ?, ?, ?);
+                        """,
+                        bindings: [
+                            .integer(Int64(slot.index)),
+                            .text(itemID.uuidString),
+                            .real(now),
+                            .real(now)
+                        ]
+                    )
+                    occupiedQuickPasteSlots.insert(slot.index)
+                    restoredQuickPasteSlotCount += 1
+                }
+            }
+            return ClipboardBackupImportResult(
+                insertedItemCount: insertedItemCount,
+                mergedItemCount: mergedItemCount,
+                createdCategoryCount: createdCategoryCount,
+                restoredQuickPasteSlotCount: restoredQuickPasteSlotCount
+            )
+        } catch {
+            for reference in newReferences { try? externalPayloadStore.delete(reference) }
+            throw error
+        }
+    }
+
+    private func itemCategoryPairs() throws -> [(itemID: UUID, categoryID: UUID)] {
+        try database.query(
+            "SELECT item_id, category_id FROM item_categories ORDER BY item_id, category_id;"
+        ).compactMap { row in
+            guard let itemID = row.uuid("item_id"),
+                  let categoryID = row.uuid("category_id") else {
+                return nil
+            }
+            return (itemID, categoryID)
+        }
+    }
+
+    private func itemsByContentHash() throws -> [String: ClipboardItem] {
+        let items = try database.query(
+            Self.itemSelect + " ORDER BY created_at, id;"
+        ).compactMap(Self.decodeItem)
+        return Dictionary(uniqueKeysWithValues: items.map { ($0.contentHash, $0) })
+    }
+
+    private func categoriesByName() throws -> [String: UUID] {
+        Dictionary(uniqueKeysWithValues: try allCategories().map { ($0.name, $0.id) })
+    }
+
+    private func mergeMetadata(
+        from item: ClipboardBackupItem,
+        into itemID: UUID,
+        database: SQLCipherDatabase
+    ) throws {
+        let title = item.customTitle?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let recognizedText = item.recognizedText?.trimmingCharacters(
+            in: .whitespacesAndNewlines
+        )
+        try database.execute(
+            """
+            UPDATE clipboard_items
+            SET is_favorite = CASE WHEN ? = 1 THEN 1 ELSE is_favorite END,
+                custom_title = CASE
+                    WHEN custom_title IS NULL AND ? IS NOT NULL THEN ?
+                    ELSE custom_title
+                END,
+                ocr_text = CASE
+                    WHEN ocr_text IS NULL AND ? IS NOT NULL THEN ?
+                    ELSE ocr_text
+                END
+            WHERE id = ?;
+            """,
+            bindings: [
+                .integer(item.isFavorite ? 1 : 0),
+                title?.isEmpty == false ? .text(title!) : .null,
+                title?.isEmpty == false ? .text(title!) : .null,
+                recognizedText?.isEmpty == false ? .text(recognizedText!) : .null,
+                recognizedText?.isEmpty == false ? .text(recognizedText!) : .null,
+                .text(itemID.uuidString)
+            ]
+        )
+    }
+
+    private func insertImportedItem(
+        _ prepared: PreparedBackupItem,
+        database: SQLCipherDatabase
+    ) throws {
+        let item = prepared.item
+        try database.execute(
+            """
+            INSERT INTO clipboard_items(
+                id, created_at, updated_at, app_name, bundle_id, kind,
+                preview_text, search_text, byte_size, content_hash,
+                is_favorite, last_used_at, custom_title, ocr_text
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+            """,
+            bindings: [
+                .text(item.id.uuidString),
+                .real(item.createdAt.timeIntervalSince1970),
+                .real(item.updatedAt.timeIntervalSince1970),
+                .text(item.appName),
+                item.bundleID.map(SQLValue.text) ?? .null,
+                .text(item.kind.rawValue),
+                .text(item.previewText),
+                .text(item.searchText),
+                .integer(Int64(item.byteSize)),
+                .text(item.contentHash),
+                .integer(item.isFavorite ? 1 : 0),
+                item.lastUsedAt.map { .real($0.timeIntervalSince1970) } ?? .null,
+                item.customTitle.map(SQLValue.text) ?? .null,
+                item.recognizedText.map(SQLValue.text) ?? .null
+            ]
+        )
+
+        for preparedPayload in prepared.payloads {
+            let payload = preparedPayload.payload
+            let digest = Data(SHA256.hash(data: payload.data))
+                .map { String(format: "%02x", $0) }.joined()
+            try database.execute(
+                """
+                INSERT INTO pasteboard_payloads(
+                    item_id, item_index, type, inline_data,
+                    external_file_name, byte_size, sha256
+                ) VALUES (?, ?, ?, ?, ?, ?, ?);
+                """,
+                bindings: [
+                    .text(item.id.uuidString),
+                    .integer(Int64(payload.itemIndex)),
+                    .text(payload.type),
+                    preparedPayload.inlineData.map(SQLValue.blob) ?? .null,
+                    preparedPayload.reference.map { .text($0.fileName) } ?? .null,
+                    .integer(Int64(payload.data.count)),
+                    .text(digest)
+                ]
+            )
+        }
+    }
+}
+
+private struct PreparedBackupItem {
+    let item: ClipboardBackupItem
+    let payloads: [PreparedBackupPayload]
+}
+
+private struct PreparedBackupPayload {
+    let payload: ClipboardBackupPayload
+    let inlineData: Data?
+    let reference: ExternalPayloadReference?
 }
 
 private extension SQLRow {

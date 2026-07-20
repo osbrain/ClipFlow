@@ -87,6 +87,10 @@ public final class SettingsModel {
     public var debugLoggingEnabled: Bool
     public var defaultPasteMode: String
     public var mainPanelOpacityPercent: Int
+    public var privacyExcludedAppIdentifiers: String
+    public var privacyExcludedContentPatterns: String
+    public var privacyIgnoresSensitiveText: Bool
+    public var smartCategorizationEnabled: Bool
     public var showDetailSource: Bool
     public var showDetailType: Bool
     public var showDetailCreatedAt: Bool
@@ -142,6 +146,12 @@ public final class SettingsModel {
         mainPanelOpacityPercent = storedMainPanelOpacity == 0
             ? MainPanelOpacity.defaultPercent
             : MainPanelOpacity.clampedPercent(storedMainPanelOpacity)
+        privacyExcludedAppIdentifiers = store.string(forKey: "privacyExcludedAppIdentifiers") ?? ""
+        privacyExcludedContentPatterns = store.string(forKey: "privacyExcludedContentPatterns") ?? ""
+        privacyIgnoresSensitiveText = store.containsValue(forKey: "privacyIgnoresSensitiveText")
+            ? store.bool(forKey: "privacyIgnoresSensitiveText") : true
+        smartCategorizationEnabled = store.containsValue(forKey: "smartCategorizationEnabled")
+            ? store.bool(forKey: "smartCategorizationEnabled") : true
         showDetailSource = store.containsValue(forKey: "showDetailSource")
             ? store.bool(forKey: "showDetailSource") : true
         showDetailType = store.containsValue(forKey: "showDetailType")
@@ -179,6 +189,10 @@ public final class SettingsModel {
         store.set(debugLoggingEnabled, forKey: "debugLoggingEnabled")
         store.set(defaultPasteMode, forKey: "defaultPasteMode")
         store.set(mainPanelOpacityPercent, forKey: "mainPanelOpacityPercent")
+        store.set(privacyExcludedAppIdentifiers, forKey: "privacyExcludedAppIdentifiers")
+        store.set(privacyExcludedContentPatterns, forKey: "privacyExcludedContentPatterns")
+        store.set(privacyIgnoresSensitiveText, forKey: "privacyIgnoresSensitiveText")
+        store.set(smartCategorizationEnabled, forKey: "smartCategorizationEnabled")
         store.set(showDetailSource, forKey: "showDetailSource")
         store.set(showDetailType, forKey: "showDetailType")
         store.set(showDetailCreatedAt, forKey: "showDetailCreatedAt")
@@ -234,5 +248,17 @@ public final class SettingsModel {
             debugLoggingEnabled: debugLoggingEnabled,
             mainPanelOpacityPercent: mainPanelOpacityPercent
         )
+    }
+
+    public var privacyCapturePolicy: PrivacyCapturePolicy {
+        PrivacyCapturePolicy(
+            excludedAppIdentifiersText: privacyExcludedAppIdentifiers,
+            excludedContentPatternsText: privacyExcludedContentPatterns,
+            ignoresSensitiveText: privacyIgnoresSensitiveText
+        )
+    }
+
+    public var smartCategoryPolicy: SmartCategoryPolicy {
+        SmartCategoryPolicy(isEnabled: smartCategorizationEnabled)
     }
 }

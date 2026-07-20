@@ -4,6 +4,13 @@ public enum ItemContextAction: String, CaseIterable, Equatable, Hashable, Sendab
     case pasteOriginal
     case pastePlainText
     case pasteFilePath
+    case copyOriginal
+    case copyPlainText
+    case copyMarkdownLink
+    case copyFilePath
+    case copyCleanText
+    case copyFirstLine
+    case copyURLs
     case openLink
     case openFile
     case revealInFinder
@@ -12,19 +19,38 @@ public enum ItemContextAction: String, CaseIterable, Equatable, Hashable, Sendab
     public static func available(for kind: ClipboardKind) -> [Self] {
         switch kind {
         case .text:
-            [.pasteOriginal, .pastePlainText, .quickLook]
+            [
+                .pasteOriginal, .pastePlainText,
+                .copyOriginal, .copyPlainText, .copyCleanText,
+                .copyFirstLine, .copyURLs, .quickLook
+            ]
         case .richText:
-            [.pasteOriginal, .pastePlainText, .quickLook]
+            [
+                .pasteOriginal, .pastePlainText,
+                .copyOriginal, .copyPlainText, .copyCleanText,
+                .copyFirstLine, .copyURLs, .quickLook
+            ]
         case .link:
-            [.pasteOriginal, .openLink, .pastePlainText, .quickLook]
+            [
+                .pasteOriginal, .openLink, .pastePlainText,
+                .copyOriginal, .copyPlainText, .copyMarkdownLink,
+                .copyCleanText, .copyFirstLine, .copyURLs, .quickLook
+            ]
         case .file:
-            [.pasteOriginal, .pasteFilePath, .openFile, .revealInFinder, .quickLook]
+            [
+                .pasteOriginal, .pasteFilePath, .openFile, .revealInFinder,
+                .copyOriginal, .copyFilePath, .quickLook
+            ]
         case .image:
-            [.pasteOriginal, .quickLook]
+            [.pasteOriginal, .copyOriginal, .quickLook]
         case .mixed:
-            [.pasteOriginal, .pastePlainText, .quickLook]
+            [
+                .pasteOriginal, .pastePlainText,
+                .copyOriginal, .copyPlainText, .copyCleanText,
+                .copyFirstLine, .copyURLs, .quickLook
+            ]
         case .unknown:
-            [.pasteOriginal, .quickLook]
+            [.pasteOriginal, .copyOriginal, .quickLook]
         }
     }
 
@@ -35,12 +61,30 @@ public enum ItemContextAction: String, CaseIterable, Equatable, Hashable, Sendab
     public var symbolName: String {
         switch self {
         case .pasteOriginal: "arrow.down.doc"
-        case .pastePlainText: "textformat"
+        case .pastePlainText: "doc.plaintext"
         case .pasteFilePath: "point.topleft.down.to.point.bottomright.curvepath"
+        case .copyOriginal: "doc.on.doc"
+        case .copyPlainText: "doc.text"
+        case .copyMarkdownLink: "link.badge.plus"
+        case .copyFilePath: "point.topleft.down.to.point.bottomright.curvepath"
+        case .copyCleanText: "wand.and.sparkles"
+        case .copyFirstLine: "text.line.first.and.arrowtriangle.forward"
+        case .copyURLs: "link"
         case .openLink: "safari"
         case .openFile: "doc.badge.arrow.up"
         case .revealInFinder: "folder"
         case .quickLook: "eye"
+        }
+    }
+
+    public var isContentOperation: Bool {
+        switch self {
+        case .copyOriginal, .copyPlainText, .copyMarkdownLink, .copyFilePath,
+             .copyCleanText, .copyFirstLine, .copyURLs:
+            true
+        case .pasteOriginal, .pastePlainText, .pasteFilePath,
+             .openLink, .openFile, .revealInFinder, .quickLook:
+            false
         }
     }
 

@@ -86,7 +86,7 @@ public final class SystemClipboard: PasteboardAccess, ClipboardWriting,
         return pasteboard.changeCount
     }
 
-    static func plainText(from payloads: [NormalizedPayload]) -> String? {
+    public static func plainText(from payloads: [NormalizedPayload]) -> String? {
         let preferredTypes = [
             "public.utf8-plain-text",
             "public.plain-text",
@@ -105,6 +105,17 @@ public final class SystemClipboard: PasteboardAccess, ClipboardWriting,
             if let text = String(data: payload.data, encoding: .utf8) {
                 return text
             }
+        }
+
+        if let fileNames = payloads.first(where: { $0.type == "NSFilenamesPboardType" }),
+           let paths = try? PropertyListSerialization.propertyList(
+               from: fileNames.data,
+               options: [],
+               format: nil
+           ) as? [String],
+           let path = paths.first,
+           !path.isEmpty {
+            return path
         }
 
         if let rtf = payloads.first(where: { $0.type == "public.rtf" }),

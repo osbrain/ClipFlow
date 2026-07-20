@@ -44,10 +44,10 @@ struct DetailView: View {
                 }
                 .clipFlowScrollAppearance()
             } else {
-                ContentUnavailableView(
-                    L10n.string("detail.empty.title"),
-                    systemImage: "cursorarrow.click",
-                    description: Text(L10n.string("detail.empty.description"))
+                ClipFlowEmptyStateView(
+                    title: L10n.string("detail.empty.title"),
+                    description: L10n.string("detail.empty.description"),
+                    symbol: "cursorarrow.click"
                 )
             }
         }

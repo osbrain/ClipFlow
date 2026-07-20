@@ -31,7 +31,11 @@ let package = Package(
                 ])
             ]
         ),
-        .target(name: "ClipFlowSystem", dependencies: ["ClipFlowCore"]),
+        .target(
+            name: "ClipFlowSystem",
+            dependencies: ["ClipFlowCore"],
+            linkerSettings: [.linkedFramework("Vision")]
+        ),
         .target(
             name: "ClipFlowUI",
             dependencies: ["ClipFlowCore", "ClipFlowStorage", "ClipFlowSystem"],

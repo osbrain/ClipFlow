@@ -47,6 +47,9 @@ final class FloatingPanelController: NSWindowController, NSWindowDelegate {
         )
         panel.contentView = NSHostingView(rootView: rootView)
         super.init(window: panel)
+        panel.handleKeyEquivalent = { [weak self] event in
+            self?.handleQuickPasteKeyEquivalent(event) ?? false
+        }
         panel.delegate = self
     }
 
@@ -94,10 +97,6 @@ final class FloatingPanelController: NSWindowController, NSWindowDelegate {
         inputState.isPanelVisible = false
         removeEventMonitor()
         window?.orderOut(nil)
-    }
-
-    func setOpacityPercent(_ percent: Int) {
-        window?.alphaValue = CGFloat(MainPanelOpacity.alphaValue(forPercent: percent))
     }
 
     func windowWillClose(_ notification: Notification) {
@@ -154,9 +153,42 @@ final class FloatingPanelController: NSWindowController, NSWindowDelegate {
         self.eventMonitor = nil
     }
 
+    private func handleQuickPasteKeyEquivalent(_ event: NSEvent) -> Bool {
+        guard window?.isKeyWindow == true,
+              let command = Self.command(for: event),
+              case .quickPaste = command else {
+            return false
+        }
+        let action = commandRouter.action(
+            for: command,
+            context: inputState.commandContext
+        )
+        guard action != .passThrough else { return false }
+        handleCommand(action)
+        return true
+    }
+
     private static func command(for event: NSEvent) -> PanelCommand? {
         let modifiers = event.modifierFlags.intersection([.command, .option, .control, .shift])
         switch event.keyCode {
+        case 18 where modifiers == [.command, .option]:
+            return PanelCommand.quickPaste(1)
+        case 19 where modifiers == [.command, .option]:
+            return PanelCommand.quickPaste(2)
+        case 20 where modifiers == [.command, .option]:
+            return PanelCommand.quickPaste(3)
+        case 21 where modifiers == [.command, .option]:
+            return PanelCommand.quickPaste(4)
+        case 23 where modifiers == [.command, .option]:
+            return PanelCommand.quickPaste(5)
+        case 22 where modifiers == [.command, .option]:
+            return PanelCommand.quickPaste(6)
+        case 26 where modifiers == [.command, .option]:
+            return PanelCommand.quickPaste(7)
+        case 28 where modifiers == [.command, .option]:
+            return PanelCommand.quickPaste(8)
+        case 25 where modifiers == [.command, .option]:
+            return PanelCommand.quickPaste(9)
         case 49 where modifiers.isEmpty:
             return PanelCommand.space
         case 36 where modifiers == .command, 76 where modifiers == .command:
@@ -263,6 +295,12 @@ final class FloatingPanelController: NSWindowController, NSWindowDelegate {
 }
 
 private final class FloatingPanel: NSPanel {
+    var handleKeyEquivalent: ((NSEvent) -> Bool)?
+
     override var canBecomeKey: Bool { true }
     override var canBecomeMain: Bool { true }
+
+    override func performKeyEquivalent(with event: NSEvent) -> Bool {
+        handleKeyEquivalent?(event) == true || super.performKeyEquivalent(with: event)
+    }
 }

@@ -74,6 +74,96 @@ struct ClipboardRepositoryTests {
         #expect(try harness.repository.categories(for: item.item.id).isEmpty)
     }
 
+    @Test("quick paste slots can be assigned replaced cleared and cascade with items")
+    func quickPasteSlotsPersistAndCascade() throws {
+        let harness = try RepositoryHarness()
+        defer { harness.cleanup() }
+        let first = try harness.repository.upsert(
+            harness.capture(hash: "slot-first", preview: "First")
+        )
+        let second = try harness.repository.upsert(
+            harness.capture(hash: "slot-second", preview: "Second")
+        )
+
+        try harness.repository.setQuickPasteSlot(1, itemID: first.item.id)
+        try harness.repository.setQuickPasteSlot(1, itemID: second.item.id)
+        try harness.repository.setQuickPasteSlot(2, itemID: first.item.id)
+
+        #expect(try harness.repository.quickPasteSlots().map(\.index) == [1, 2])
+        #expect(try harness.repository.quickPasteSlots().map(\.item.id) == [
+            second.item.id, first.item.id
+        ])
+
+        try harness.repository.clearQuickPasteSlot(2)
+        #expect(try harness.repository.quickPasteSlots().map(\.index) == [1])
+
+        try harness.repository.delete(second.item.id)
+        #expect(try harness.repository.quickPasteSlots().isEmpty)
+    }
+
+    @Test("paste stack preserves insertion order and cascades with deleted items")
+    func pasteStackPersistsAndCascades() throws {
+        let harness = try RepositoryHarness()
+        defer { harness.cleanup() }
+        let first = try harness.repository.upsert(
+            harness.capture(hash: "stack-first", preview: "First")
+        )
+        let second = try harness.repository.upsert(
+            harness.capture(hash: "stack-second", preview: "Second")
+        )
+
+        try harness.repository.appendToPasteStack(itemID: first.item.id)
+        try harness.repository.appendToPasteStack(itemID: second.item.id)
+        try harness.repository.appendToPasteStack(itemID: first.item.id)
+
+        #expect(try harness.repository.pasteStackItems().map(\.item.id) == [
+            first.item.id, second.item.id, first.item.id
+        ])
+
+        try harness.repository.removePasteStackItem(at: 2)
+        #expect(try harness.repository.pasteStackItems().map(\.item.id) == [
+            first.item.id, first.item.id
+        ])
+
+        try harness.repository.delete(first.item.id)
+        #expect(try harness.repository.pasteStackItems().isEmpty)
+    }
+
+    @Test("recognized local text becomes searchable with the existing history query")
+    func recognizedTextParticipatesInSearch() throws {
+        let harness = try RepositoryHarness()
+        defer { harness.cleanup() }
+        let item = try harness.repository.upsert(
+            harness.capture(hash: "ocr-image", preview: "Screenshot")
+        )
+
+        try harness.repository.updateRecognizedText("Invoice 2048", for: item.item.id)
+
+        let results = try harness.repository.search(
+            SearchQuery(text: "2048", categoryID: nil, kind: nil, favoritesOnly: false)
+        )
+        #expect(results.map(\.id) == [item.item.id])
+        #expect(results.first?.recognizedText == "Invoice 2048")
+    }
+
+    @Test("expired temporary clips are removed before history search")
+    func expiredTemporaryClipsArePurgedBeforeSearch() throws {
+        let harness = try RepositoryHarness()
+        defer { harness.cleanup() }
+        let item = try harness.repository.upsert(
+            harness.capture(hash: "temporary", preview: "Temporary")
+        )
+
+        try harness.repository.setTemporaryPolicy(
+            for: item.item.id,
+            expiresAt: Date.distantPast,
+            isOneTime: false
+        )
+
+        #expect(try harness.repository.search(Self.emptyQuery).isEmpty)
+        #expect(try harness.repository.item(id: item.item.id) == nil)
+    }
+
     @Test("supplied timestamps persist and determine search order")
     func suppliedTimestampsPersistAndOrderResults() throws {
         let harness = try RepositoryHarness()
@@ -257,6 +347,167 @@ struct ClipboardRepositoryTests {
 
         #expect(queryCounter.value == 1)
     }
+
+    @Test("encrypted backup hides plaintext and imports with the correct password")
+    func encryptedBackupRoundTripsWithPassword() throws {
+        let source = try RepositoryHarness(externalThresholdBytes: 1)
+        defer { source.cleanup() }
+        let destination = try RepositoryHarness(externalThresholdBytes: 1)
+        defer { destination.cleanup() }
+        let inserted = try source.repository.upsert(
+            source.dataCapture(
+                hash: "backup-secret",
+                byteCount: 48,
+                sourceAppName: "Notes",
+                sourceBundleID: "com.apple.Notes",
+                fillByte: 0x73
+            ),
+            timestamp: Date(timeIntervalSince1970: 1_700_000_000)
+        )
+        try source.repository.setFavorite(true, for: inserted.item.id)
+        try source.repository.rename(inserted.item.id, title: "Secret title")
+        let category = try source.repository.createCategory(name: "Backups")
+        try source.repository.assign(itemID: inserted.item.id, categoryID: category.id)
+        try source.repository.setQuickPasteSlot(1, itemID: inserted.item.id)
+        try source.repository.updateRecognizedText("Invoice 2048", for: inserted.item.id)
+
+        let backup = try source.repository.exportEncryptedBackup(password: "correct horse")
+
+        #expect(!String(decoding: backup, as: UTF8.self).contains("Secret title"))
+        #expect(!String(decoding: backup, as: UTF8.self).contains("backup-secret"))
+
+        let result = try destination.repository.importEncryptedBackup(
+            backup,
+            password: "correct horse"
+        )
+        let imported = try #require(destination.repository.search(Self.emptyQuery).first)
+
+        #expect(result.insertedItemCount == 1)
+        #expect(result.mergedItemCount == 0)
+        #expect(imported.contentHash == "backup-secret")
+        #expect(imported.isFavorite)
+        #expect(imported.customTitle == "Secret title")
+        #expect(imported.recognizedText == "Invoice 2048")
+        #expect(try destination.repository.payloads(for: imported.id).first?.data.count == 48)
+        #expect(try destination.repository.categories(for: imported.id).map(\.name) == ["Backups"])
+        #expect(try destination.repository.quickPasteSlots().map(\.item.id) == [imported.id])
+    }
+
+    @Test("encrypted backup rejects wrong passwords before mutating the repository")
+    func encryptedBackupRejectsWrongPasswordWithoutMutation() throws {
+        let source = try RepositoryHarness()
+        defer { source.cleanup() }
+        let destination = try RepositoryHarness()
+        defer { destination.cleanup() }
+        _ = try source.repository.upsert(source.capture(hash: "safe", preview: "Safe"))
+        let local = try destination.repository.upsert(
+            destination.capture(hash: "local", preview: "Local")
+        )
+        let backup = try source.repository.exportEncryptedBackup(password: "right password")
+
+        #expect(throws: ClipboardBackupError.self) {
+            try destination.repository.importEncryptedBackup(backup, password: "wrong password")
+        }
+
+        let items = try destination.repository.search(Self.emptyQuery)
+        #expect(items.map(\.id) == [local.item.id])
+        #expect(items.map(\.contentHash) == ["local"])
+    }
+
+    @Test("encrypted backup rejects tampered KDF parameters before decrypting")
+    func encryptedBackupRejectsTamperedKDFParameters() throws {
+        let source = try RepositoryHarness()
+        defer { source.cleanup() }
+        let destination = try RepositoryHarness()
+        defer { destination.cleanup() }
+        _ = try source.repository.upsert(source.capture(hash: "safe", preview: "Safe"))
+        let backup = try source.repository.exportEncryptedBackup(password: "right password")
+        var envelope = try #require(
+            JSONSerialization.jsonObject(with: backup) as? [String: Any]
+        )
+        envelope["iterations"] = 120_001
+        let tampered = try JSONSerialization.data(withJSONObject: envelope)
+
+        #expect(throws: ClipboardBackupError.invalidArchive) {
+            try destination.repository.importEncryptedBackup(tampered, password: "right password")
+        }
+
+        #expect(try destination.repository.search(Self.emptyQuery).isEmpty)
+    }
+
+    @Test("encrypted backup rejects random salt generation failure")
+    func encryptedBackupRejectsRandomSaltGenerationFailure() {
+        #expect(throws: ClipboardBackupError.invalidArchive) {
+            try EncryptedBackupCodec.randomData(byteCount: 16) { _, _ in
+                errSecAllocate
+            }
+        }
+    }
+
+    @Test("encrypted backup import merges duplicates without replacing local payloads")
+    func encryptedBackupImportMergesDuplicates() throws {
+        let source = try RepositoryHarness()
+        defer { source.cleanup() }
+        let destination = try RepositoryHarness()
+        defer { destination.cleanup() }
+        let exported = try source.repository.upsert(
+            source.capture(hash: "same-content", preview: "Exported payload")
+        )
+        try source.repository.setFavorite(true, for: exported.item.id)
+        try source.repository.rename(exported.item.id, title: "Imported title")
+        let backup = try source.repository.exportEncryptedBackup(password: "merge")
+
+        let local = try destination.repository.upsert(
+            destination.capture(hash: "same-content", preview: "Local payload")
+        )
+        let result = try destination.repository.importEncryptedBackup(backup, password: "merge")
+        let item = try #require(try destination.repository.item(id: local.item.id))
+
+        #expect(result.insertedItemCount == 0)
+        #expect(result.mergedItemCount == 1)
+        #expect(item.id == local.item.id)
+        #expect(item.previewText == "Local payload")
+        #expect(item.isFavorite)
+        #expect(item.customTitle == "Imported title")
+        #expect(
+            String(
+                decoding: try destination.repository.payloads(for: local.item.id).first?.data ?? Data(),
+                as: UTF8.self
+            ) == "Local payload"
+        )
+    }
+
+    @Test("encrypted backup import keeps existing quick paste slots")
+    func encryptedBackupImportDoesNotReplaceExistingQuickPasteSlots() throws {
+        let source = try RepositoryHarness()
+        defer { source.cleanup() }
+        let destination = try RepositoryHarness()
+        defer { destination.cleanup() }
+        let exported = try source.repository.upsert(
+            source.capture(hash: "exported-slot", preview: "Exported Slot")
+        )
+        try source.repository.setQuickPasteSlot(1, itemID: exported.item.id)
+        let backup = try source.repository.exportEncryptedBackup(password: "slots")
+
+        let local = try destination.repository.upsert(
+            destination.capture(hash: "local-slot", preview: "Local Slot")
+        )
+        try destination.repository.setQuickPasteSlot(1, itemID: local.item.id)
+
+        let result = try destination.repository.importEncryptedBackup(backup, password: "slots")
+        let slots = try destination.repository.quickPasteSlots()
+
+        #expect(result.restoredQuickPasteSlotCount == 0)
+        #expect(slots.map(\.index) == [1])
+        #expect(slots.map(\.item.id) == [local.item.id])
+    }
+
+    private static let emptyQuery = SearchQuery(
+        text: "",
+        categoryID: nil,
+        kind: nil,
+        favoritesOnly: false
+    )
 }
 
 private final class RepositoryHarness {

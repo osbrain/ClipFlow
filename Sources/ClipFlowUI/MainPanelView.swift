@@ -18,6 +18,7 @@ public struct MainPanelView: View {
     @State private var pendingDeleteItemID: UUID?
     @State private var showingCreateCategory = false
     @State private var categoryName = ""
+    @State private var pendingTemplate: SnippetTemplate?
     @State private var historyReloadTask: Task<Void, Never>?
 
     public init(
@@ -66,7 +67,9 @@ public struct MainPanelView: View {
             maxWidth: MainPanelLayout.maximumWidth,
             minHeight: MainPanelLayout.minimumHeight
         )
-        .background(.regularMaterial)
+        .background {
+            mainPanelBackground
+        }
         .clipShape(
             RoundedRectangle(
                 cornerRadius: ClipFlowVisualStyle.windowRadius,
@@ -105,6 +108,11 @@ public struct MainPanelView: View {
         .onChange(of: showingRename) { synchronizeSheetState() }
         .onChange(of: showingDeleteConfirmation) { synchronizeSheetState() }
         .onChange(of: showingCreateCategory) { synchronizeSheetState() }
+        .sheet(item: $pendingTemplate) { template in
+            TemplateVariableSheet(template: template) { values in
+                Task { await model.pasteTemplate(template, values: values) }
+            }
+        }
         .onChange(of: browserModel?.isShowing) { handleHistoryModeChange() }
         .alert(L10n.string("action.rename"), isPresented: $showingRename) {
             TextField(L10n.string("rename.title.placeholder"), text: $renameText)
@@ -132,6 +140,14 @@ public struct MainPanelView: View {
                 Task { await model.createCategory(named: categoryName) }
             }
         }
+    }
+
+    private var mainPanelBackground: some View {
+        ClipFlowAuroraBackground(
+            materialOpacity: MainPanelOpacity.alphaValue(
+                forPercent: settings.mainPanelOpacityPercent
+            )
+        )
     }
 
     private var leftPane: some View {
@@ -162,6 +178,42 @@ public struct MainPanelView: View {
                     focusTarget: $focusTarget
                 )
             } else {
+                QuickPasteSlotStrip(
+                    slots: model.quickPasteSlots,
+                    canPinSelection: model.selectedItem != nil,
+                    pasteSlot: { index in
+                        Task { await model.pasteQuickSlot(index) }
+                    },
+                    pinSelectionToSlot: { index in
+                        guard let selectedItemID = model.selectedItemID else { return }
+                        Task { await model.setQuickPasteSlot(index, itemID: selectedItemID) }
+                    },
+                    clearSlot: { index in
+                        Task { await model.clearQuickPasteSlot(index) }
+                    }
+                )
+
+                PasteStackStrip(
+                    entries: model.pasteStack,
+                    pasteNext: {
+                        Task { await model.pasteNextStackItem() }
+                    },
+                    remove: { position in
+                        Task { await model.removePasteStackItem(at: position) }
+                    },
+                    clear: {
+                        Task { await model.clearPasteStack() }
+                    }
+                )
+
+                TemplateStrip(templates: model.templates) { template in
+                    if template.variables.isEmpty {
+                        Task { await model.pasteTemplate(template, values: [:]) }
+                    } else {
+                        pendingTemplate = template
+                    }
+                }
+
                 HistoryCardList(
                     model: model,
                     rowHeight: settings.listDensity.rowHeight,
@@ -840,6 +892,11 @@ private struct HistoryCardList: View {
                                         model.requestThumbnail(for: item, maximumPixelSize: 320)
                                     }
                                 }
+                                .onAppear {
+                                    if item.id == model.items.last?.id {
+                                        Task { await model.loadMore() }
+                                    }
+                                }
                                 .onDrag {
                                     model.dragProvider(for: item)
                                         ?? NSItemProvider(object: item.previewText as NSString)
@@ -872,43 +929,473 @@ private struct HistoryCardList: View {
 
     @ViewBuilder
     private func itemContextMenu(_ item: ClipboardItem) -> some View {
-        Button(L10n.string("detail.paste")) {
+        let contextActions = model.contextActions(for: item)
+        let secondaryContextActions = contextActions.filter {
+            !$0.isContentOperation && $0 != .pasteOriginal && $0 != .quickLook
+        }
+        let contentActions = contextActions.filter(\.isContentOperation)
+
+        Button {
             select(item)
             Task { await model.pasteSelection() }
+        } label: {
+            Label(L10n.string("detail.paste"), systemImage: "clipboard")
         }
-        Button(L10n.string("detail.preview")) {
+        Button {
             select(item)
             model.previewSelection()
+        } label: {
+            Label(L10n.string("detail.preview"), systemImage: "eye")
         }
-        ForEach(model.applicationActions(for: item), id: \.self) { action in
-            Button(action.localizedDisplayName) {
-                select(item)
-                Task { await model.performApplicationAction(action) }
+        ForEach(secondaryContextActions, id: \.self) { action in
+            contextActionMenuButton(action, item: item)
+        }
+        if !contentActions.isEmpty {
+            Menu {
+                ForEach(contentActions, id: \.self) { action in
+                    contextActionMenuButton(action, item: item)
+                }
+            } label: {
+                Label(L10n.string("contextAction.contentOperations"), systemImage: "doc.on.doc")
             }
         }
-        Button(L10n.string(item.isFavorite ? "action.removeFavorite" : "action.favorite")) {
+        Menu {
+            ForEach(1...9, id: \.self) { index in
+                Button {
+                    select(item)
+                    Task { await model.setQuickPasteSlot(index, itemID: item.id) }
+                } label: {
+                    Label(quickPasteSlotMenuTitle(for: index), systemImage: "pin")
+                }
+            }
+        } label: {
+            Label(L10n.string("quickPaste.pin"), systemImage: "pin.fill")
+        }
+        Button {
+            select(item)
+            Task { await model.addToPasteStack(item.id) }
+        } label: {
+            Label(L10n.string("pasteStack.add"), systemImage: "rectangle.stack.badge.plus")
+        }
+        Menu {
+            Button {
+                Task {
+                    await model.setTemporaryPolicy(
+                        for: item.id,
+                        expiresAt: nil,
+                        isOneTime: true
+                    )
+                }
+            } label: {
+                Label(L10n.string("temporary.oneTime"), systemImage: "flame")
+            }
+            Divider()
+            ForEach([5, 30, 60], id: \.self) { minutes in
+                Button {
+                    Task {
+                        await model.setTemporaryPolicy(
+                            for: item.id,
+                            expiresAt: Date().addingTimeInterval(TimeInterval(minutes * 60)),
+                            isOneTime: false
+                        )
+                    }
+                } label: {
+                    Label(L10n.format("temporary.expiresIn", minutes), systemImage: "timer")
+                }
+            }
+            if item.isOneTime || item.expiresAt != nil {
+                Divider()
+                Button {
+                    Task {
+                        await model.setTemporaryPolicy(
+                            for: item.id,
+                            expiresAt: nil,
+                            isOneTime: false
+                        )
+                    }
+                } label: {
+                    Label(L10n.string("temporary.clear"), systemImage: "xmark")
+                }
+            }
+        } label: {
+            Label(L10n.string("temporary.title"), systemImage: "lock")
+        }
+        if item.kind == .text || item.kind == .richText {
+            Button {
+                Task { await model.createTemplate(from: item) }
+            } label: {
+                Label(L10n.string("template.create"), systemImage: "curlybraces.square")
+            }
+        }
+        ForEach(model.applicationActions(for: item), id: \.self) { action in
+            Button {
+                select(item)
+                Task { await model.performApplicationAction(action) }
+            } label: {
+                Label(action.localizedDisplayName, systemImage: action.symbolName)
+            }
+        }
+        Button {
             select(item)
             Task { await model.toggleFavoriteSelection() }
+        } label: {
+            Label(
+                L10n.string(item.isFavorite ? "action.removeFavorite" : "action.favorite"),
+                systemImage: item.isFavorite ? "star.slash" : "star"
+            )
         }
-        Button(L10n.string("action.rename")) {
+        Button {
             select(item)
             beginRename()
+        } label: {
+            Label(L10n.string("action.rename"), systemImage: "pencil")
         }
         if !model.categories.isEmpty {
-            Menu(L10n.string("category.assign")) {
+            Menu {
                 ForEach(model.categories) { category in
-                    Button(category.name) {
+                    Button {
                         select(item)
                         Task { await model.assignSelection(to: category.id) }
+                    } label: {
+                        Label(category.name, systemImage: "folder")
                     }
                 }
+            } label: {
+                Label(L10n.string("category.assign"), systemImage: "folder.badge.plus")
             }
         }
         Divider()
-        Button(L10n.string("action.delete"), role: .destructive) {
+        Button(role: .destructive) {
             select(item)
             beginDelete()
+        } label: {
+            Label(L10n.string("action.delete"), systemImage: "trash")
         }
+    }
+
+    private func contextActionMenuButton(
+        _ action: ItemContextAction,
+        item: ClipboardItem
+    ) -> some View {
+        Button {
+            select(item)
+            Task { await model.performContextAction(action) }
+        } label: {
+            Label(L10n.string(action.titleKey(for: item.kind)), systemImage: action.symbolName)
+        }
+    }
+
+    private func quickPasteSlotMenuTitle(for index: Int) -> String {
+        if model.quickPasteSlots.contains(where: { $0.index == index }) {
+            return L10n.format("quickPaste.replaceSlot", index)
+        }
+        return L10n.format("quickPaste.pinToSlot", index)
+    }
+}
+
+private struct QuickPasteSlotStrip: View {
+    let slots: [QuickPasteSlot]
+    let canPinSelection: Bool
+    let pasteSlot: (Int) -> Void
+    let pinSelectionToSlot: (Int) -> Void
+    let clearSlot: (Int) -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 7) {
+            HStack(spacing: 8) {
+                Label(L10n.string("quickPaste.title"), systemImage: "pin.fill")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.secondary)
+
+                Text(L10n.string("quickPaste.shortcutHint"))
+                    .font(.caption2.monospaced())
+                    .foregroundStyle(.tertiary)
+
+                Spacer(minLength: 8)
+
+                pinMenu
+            }
+            .padding(.horizontal, ClipFlowVisualStyle.panelPadding)
+
+            if slots.isEmpty {
+                emptyState
+                    .padding(.horizontal, ClipFlowVisualStyle.panelPadding)
+                    .padding(.bottom, 8)
+            } else {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 8) {
+                        ForEach(slots) { slot in
+                            slotButton(slot)
+                        }
+                    }
+                    .padding(.horizontal, ClipFlowVisualStyle.panelPadding)
+                    .padding(.bottom, 8)
+                }
+                .frame(height: 48)
+            }
+        }
+    }
+
+    private var pinMenu: some View {
+        Menu {
+            ForEach(1...9, id: \.self) { index in
+                Button(slotMenuTitle(for: index)) {
+                    pinSelectionToSlot(index)
+                }
+            }
+        } label: {
+            Label(L10n.string("quickPaste.add"), systemImage: "plus")
+                .font(.caption.weight(.medium))
+        }
+        .menuStyle(.borderlessButton)
+        .fixedSize()
+        .disabled(!canPinSelection)
+        .help(L10n.string("quickPaste.addHelp"))
+    }
+
+    private var emptyState: some View {
+        HStack(spacing: 10) {
+            QuickPasteEmptyStateIcon()
+
+            Text(L10n.string("quickPaste.emptyTitle"))
+                .font(.callout.weight(.medium))
+                .foregroundStyle(.primary)
+
+            Divider()
+                .frame(height: 18)
+
+            Text(L10n.string("quickPaste.emptyDescription"))
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+                .truncationMode(.tail)
+
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 12)
+        .frame(height: 48)
+        .background(
+            Color.primary.opacity(0.035),
+            in: RoundedRectangle(cornerRadius: ClipFlowVisualStyle.controlRadius, style: .continuous)
+        )
+        .overlay {
+            RoundedRectangle(cornerRadius: ClipFlowVisualStyle.controlRadius, style: .continuous)
+                .stroke(ClipFlowVisualStyle.hairlineColor)
+        }
+    }
+
+    @ViewBuilder
+    private func slotButton(_ slot: QuickPasteSlot) -> some View {
+        let index = slot.index
+        Button {
+            pasteSlot(index)
+        } label: {
+            HStack(spacing: 7) {
+                Text("\(index)")
+                    .font(.caption.monospacedDigit().weight(.bold))
+                    .foregroundStyle(Color.accentColor)
+                    .frame(width: 18, height: 18)
+                    .background(
+                        Color.primary.opacity(0.09),
+                        in: RoundedRectangle(cornerRadius: 5)
+                    )
+
+                Image(systemName: slot.item.kind.presentation.symbolName)
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.primary)
+
+                Text(slot.item.displayTitle)
+                    .font(.caption)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+                    .foregroundStyle(.primary)
+                    .frame(width: 82, alignment: .leading)
+            }
+            .padding(.horizontal, 9)
+            .padding(.vertical, 7)
+            .background(
+                Color.primary.opacity(0.045),
+                in: RoundedRectangle(cornerRadius: ClipFlowVisualStyle.controlRadius)
+            )
+            .overlay {
+                RoundedRectangle(cornerRadius: ClipFlowVisualStyle.controlRadius)
+                    .stroke(ClipFlowVisualStyle.hairlineColor)
+            }
+        }
+        .buttonStyle(.plain)
+        .help(L10n.format("quickPaste.slotHelp", slot.item.displayTitle, index))
+        .contextMenu {
+            Button(L10n.format("quickPaste.clearSlot", index), role: .destructive) {
+                clearSlot(index)
+            }
+        }
+    }
+
+    private func slotMenuTitle(for index: Int) -> String {
+        if slots.contains(where: { $0.index == index }) {
+            return L10n.format("quickPaste.replaceSlot", index)
+        }
+        return L10n.format("quickPaste.pinToSlot", index)
+    }
+
+}
+
+private struct QuickPasteEmptyStateIcon: View {
+    var body: some View {
+        Image(systemName: "pin")
+            .font(.system(size: 14, weight: .semibold))
+            .symbolRenderingMode(.hierarchical)
+            .foregroundStyle(Color.accentColor)
+            .frame(width: 30, height: 30)
+            .background(
+                Color.accentColor.opacity(0.12),
+                in: RoundedRectangle(cornerRadius: 9, style: .continuous)
+            )
+            .overlay {
+                RoundedRectangle(cornerRadius: 9, style: .continuous)
+                    .stroke(Color.accentColor.opacity(0.14))
+            }
+            .accessibilityHidden(true)
+    }
+}
+
+private struct PasteStackStrip: View {
+    let entries: [PasteStackItem]
+    let pasteNext: () -> Void
+    let remove: (Int) -> Void
+    let clear: () -> Void
+
+    var body: some View {
+        if let next = entries.first {
+            HStack(spacing: 8) {
+                Image(systemName: "rectangle.stack.fill")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(Color.accentColor)
+                    .accessibilityHidden(true)
+
+                Text(L10n.string("pasteStack.title"))
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.secondary)
+
+                Button(action: pasteNext) {
+                    Label(
+                        L10n.string("pasteStack.pasteNext"),
+                        systemImage: "arrow.right.doc.on.clipboard"
+                    )
+                    .font(.caption.weight(.medium))
+                }
+                .buttonStyle(.borderless)
+                .help(L10n.format("pasteStack.pasteNextHelp", next.item.displayTitle))
+
+                Image(systemName: next.item.kind.presentation.symbolName)
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                    .accessibilityHidden(true)
+
+                Text(next.item.displayTitle)
+                    .font(.caption)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+
+                Spacer(minLength: 6)
+
+                if entries.count > 1 {
+                    Text(L10n.format("pasteStack.remaining", entries.count - 1))
+                        .font(.caption2.monospacedDigit())
+                        .foregroundStyle(.secondary)
+                }
+
+                Button {
+                    remove(next.position)
+                } label: {
+                    Image(systemName: "xmark")
+                }
+                .buttonStyle(.borderless)
+                .help(L10n.string("pasteStack.remove"))
+
+                Button(role: .destructive, action: clear) {
+                    Image(systemName: "trash")
+                }
+                .buttonStyle(.borderless)
+                .help(L10n.string("pasteStack.clear"))
+            }
+            .padding(.horizontal, ClipFlowVisualStyle.panelPadding)
+            .padding(.vertical, 8)
+            .background(Color.primary.opacity(0.025))
+            .overlay(alignment: .bottom) {
+                Divider()
+            }
+        }
+    }
+}
+
+private struct TemplateStrip: View {
+    let templates: [SnippetTemplate]
+    let paste: (SnippetTemplate) -> Void
+
+    var body: some View {
+        if !templates.isEmpty {
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    Label(L10n.string("template.title"), systemImage: "curlybraces.square")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                    ForEach(templates) { template in
+                        Button {
+                            paste(template)
+                        } label: {
+                            Label(template.title, systemImage: "text.badge.checkmark")
+                                .font(.caption)
+                                .lineLimit(1)
+                        }
+                        .buttonStyle(.borderless)
+                    }
+                }
+                .padding(.horizontal, ClipFlowVisualStyle.panelPadding)
+                .padding(.vertical, 7)
+            }
+            .overlay(alignment: .bottom) { Divider() }
+        }
+    }
+}
+
+private struct TemplateVariableSheet: View {
+    let template: SnippetTemplate
+    let paste: ([String: String]) -> Void
+    @Environment(\.dismiss) private var dismiss
+    @State private var values: [String: String]
+
+    init(template: SnippetTemplate, paste: @escaping ([String: String]) -> Void) {
+        self.template = template
+        self.paste = paste
+        _values = State(initialValue: Dictionary(
+            uniqueKeysWithValues: template.variables.map { ($0, "") }
+        ))
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Text(template.title)
+                .font(.headline)
+            ForEach(template.variables, id: \.self) { variable in
+                TextField(variable, text: Binding(
+                    get: { values[variable, default: ""] },
+                    set: { values[variable] = $0 }
+                ))
+                .textFieldStyle(.roundedBorder)
+            }
+            HStack {
+                Spacer()
+                Button(L10n.string("common.cancel")) { dismiss() }
+                Button(L10n.string("template.paste")) {
+                    paste(values)
+                    dismiss()
+                }
+                .keyboardShortcut(.return, modifiers: [])
+            }
+        }
+        .padding(20)
+        .frame(width: 360)
     }
 }
 
@@ -935,6 +1422,12 @@ private struct HistoryCardRow: View {
                             .font(.caption)
                             .foregroundStyle(.yellow)
                             .accessibilityLabel(L10n.string("filter.favorites"))
+                    }
+                    if item.isOneTime || item.expiresAt != nil {
+                        Image(systemName: item.isOneTime ? "flame" : "timer")
+                            .font(.caption)
+                            .foregroundStyle(.orange)
+                            .accessibilityLabel(L10n.string("temporary.title"))
                     }
                 }
 

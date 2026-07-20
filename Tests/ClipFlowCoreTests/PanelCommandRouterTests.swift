@@ -53,6 +53,22 @@ struct PanelCommandRouterTests {
         #expect(router.action(for: .moveUp, context: .init(focus: .editing)) == .passThrough)
         #expect(router.action(for: .moveDown, context: .init(focus: .editing)) == .passThrough)
     }
+
+    @Test("quick paste shortcuts work from panel focus states but not modal editing")
+    func quickPasteBehavior() {
+        #expect(
+            router.action(for: .quickPaste(4), context: .init(focus: .search))
+                == .pasteQuickSlot(4)
+        )
+        #expect(
+            router.action(for: .quickPaste(9), context: .init(focus: .list))
+                == .pasteQuickSlot(9)
+        )
+        #expect(
+            router.action(for: .quickPaste(1), context: .init(focus: .editing))
+                == .passThrough
+        )
+    }
 }
 
 @Suite("Panel event routing scope")

@@ -12,6 +12,8 @@ public enum SettingsControlLayout {
 enum SettingsCategory: CaseIterable, Hashable, Identifiable {
     case general
     case storage
+    case backup
+    case privacy
     case permissions
     case startup
     case details
@@ -23,6 +25,8 @@ enum SettingsCategory: CaseIterable, Hashable, Identifiable {
         switch self {
         case .general: "settings.general"
         case .storage: "settings.retention"
+        case .backup: "settings.backup"
+        case .privacy: "settings.privacy"
         case .permissions: "settings.permissions"
         case .startup: "settings.startup"
         case .details: "settings.details"
@@ -36,6 +40,10 @@ enum SettingsCategory: CaseIterable, Hashable, Identifiable {
             titleKey
         case .storage:
             "settings.sidebar.storage"
+        case .backup:
+            "settings.sidebar.backup"
+        case .privacy:
+            "settings.sidebar.privacy"
         case .permissions:
             "settings.sidebar.permissions"
         case .details:
@@ -47,6 +55,8 @@ enum SettingsCategory: CaseIterable, Hashable, Identifiable {
         switch self {
         case .general: "gearshape"
         case .storage: "externaldrive"
+        case .backup: "archivebox"
+        case .privacy: "lock.shield"
         case .permissions: "hand.raised"
         case .startup: "power"
         case .details: "list.bullet.rectangle"
@@ -62,6 +72,8 @@ public struct SettingsView: View {
         AppSettingsRuntimeSnapshot,
         AppSettingsRuntimeSnapshot
     ) -> Void
+    private let exportEncryptedBackup: () -> Void
+    private let importEncryptedBackup: () -> Void
     @State private var isRestoringLoginItem = false
     @State private var selectedCategory: SettingsCategory = .general
 
@@ -71,11 +83,15 @@ public struct SettingsView: View {
         onRuntimeSettingsChange: @escaping @MainActor (
             AppSettingsRuntimeSnapshot,
             AppSettingsRuntimeSnapshot
-        ) -> Void = { _, _ in }
+        ) -> Void = { _, _ in },
+        exportEncryptedBackup: @escaping () -> Void = {},
+        importEncryptedBackup: @escaping () -> Void = {}
     ) {
         self.model = model
         self.loginItemService = loginItemService
         self.onRuntimeSettingsChange = onRuntimeSettingsChange
+        self.exportEncryptedBackup = exportEncryptedBackup
+        self.importEncryptedBackup = importEncryptedBackup
     }
 
     public var body: some View {
@@ -168,6 +184,8 @@ public struct SettingsView: View {
         switch selectedCategory {
         case .general: generalSection
         case .storage: retentionSection
+        case .backup: backupSection
+        case .privacy: privacySection
         case .permissions: permissionsSection
         case .startup: startupSection
         case .details: detailFieldsSection
@@ -316,6 +334,82 @@ public struct SettingsView: View {
                     .labelsHidden()
                     .accessibilityLabel(L10n.string("settings.externalThreshold"))
                     .help(L10n.string("settings.externalThreshold"))
+                }
+            }
+        }
+    }
+
+    private var backupSection: some View {
+        GlassSection(title: L10n.string("settings.backup"), icon: "archivebox") {
+            VStack(spacing: 10) {
+                GlassRow(
+                    icon: "lock.doc",
+                    title: L10n.string("settings.backup"),
+                    subtitle: L10n.string("settings.backup.help")
+                ) {
+                    Button {
+                        exportEncryptedBackup()
+                    } label: {
+                        Label(
+                            L10n.string("settings.backup.export"),
+                            systemImage: "square.and.arrow.up"
+                        )
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                    .help(L10n.string("settings.backup.export.help"))
+
+                    Button {
+                        importEncryptedBackup()
+                    } label: {
+                        Label(
+                            L10n.string("settings.backup.import"),
+                            systemImage: "square.and.arrow.down"
+                        )
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                    .help(L10n.string("settings.backup.import.help"))
+                }
+            }
+        }
+    }
+
+    private var privacySection: some View {
+        GlassSection(title: L10n.string("settings.privacy"), icon: "lock.shield") {
+            VStack(spacing: 10) {
+                toggleRow(
+                    icon: "key.viewfinder",
+                    title: L10n.string("settings.privacy.sensitiveText"),
+                    isOn: $model.privacyIgnoresSensitiveText,
+                    subtitle: L10n.string("settings.privacy.sensitiveText.help")
+                )
+
+                toggleRow(
+                    icon: "wand.and.sparkles",
+                    title: L10n.string("settings.smartCategorization"),
+                    isOn: $model.smartCategorizationEnabled,
+                    subtitle: L10n.string("settings.smartCategorization.help")
+                )
+
+                Divider().overlay(ClipFlowVisualStyle.hairlineColor)
+
+                VStack(spacing: 14) {
+                    multilineRuleRow(
+                        icon: "app.badge.checkmark",
+                        title: L10n.string("settings.privacy.excludedApps"),
+                        subtitle: L10n.string("settings.privacy.excludedApps.help"),
+                        text: $model.privacyExcludedAppIdentifiers
+                    )
+
+                    Divider().overlay(ClipFlowVisualStyle.hairlineColor)
+
+                    multilineRuleRow(
+                        icon: "text.badge.xmark",
+                        title: L10n.string("settings.privacy.excludedContent"),
+                        subtitle: L10n.string("settings.privacy.excludedContent.help"),
+                        text: $model.privacyExcludedContentPatterns
+                    )
                 }
             }
         }
@@ -584,6 +678,15 @@ public struct SettingsView: View {
         }
     }
 
+    private func multilineRuleRow(
+        icon: String,
+        title: String,
+        subtitle: String,
+        text: Binding<String>
+    ) -> some View {
+        PrivacyRuleEditor(icon: icon, title: title, subtitle: subtitle, text: text)
+    }
+
     private var snapshot: SettingsSnapshot {
         SettingsSnapshot(
             shortcut: model.shortcut,
@@ -602,6 +705,10 @@ public struct SettingsView: View {
             debugLoggingEnabled: model.debugLoggingEnabled,
             defaultPasteMode: model.defaultPasteMode,
             mainPanelOpacityPercent: model.mainPanelOpacityPercent,
+            privacyExcludedAppIdentifiers: model.privacyExcludedAppIdentifiers,
+            privacyExcludedContentPatterns: model.privacyExcludedContentPatterns,
+            privacyIgnoresSensitiveText: model.privacyIgnoresSensitiveText,
+            smartCategorizationEnabled: model.smartCategorizationEnabled,
             detailFlags: [
                 model.showDetailSource, model.showDetailType,
                 model.showDetailCreatedAt, model.showDetailLastUsedAt,
@@ -639,6 +746,63 @@ public struct SettingsView: View {
     }
 }
 
+private struct PrivacyRuleEditor: View {
+    let icon: String
+    let title: String
+    let subtitle: String
+    @Binding var text: String
+
+    init(icon: String, title: String, subtitle: String, text: Binding<String>) {
+        self.icon = icon
+        self.title = title
+        self.subtitle = subtitle
+        _text = text
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .top, spacing: 10) {
+                Image(systemName: icon)
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(.tint)
+                    .frame(width: 28, height: 28)
+                    .background(
+                        Color.accentColor.opacity(0.10),
+                        in: RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    )
+                    .accessibilityHidden(true)
+
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(title)
+                        .font(.body.weight(.medium))
+                        .foregroundStyle(.primary)
+                    Text(subtitle)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+
+            TextEditor(text: $text)
+                .font(.callout.monospaced())
+                .scrollContentBackground(.hidden)
+                .frame(maxWidth: .infinity, minHeight: 76)
+                .padding(8)
+                .background(
+                    Color.primary.opacity(0.045),
+                    in: RoundedRectangle(cornerRadius: 9, style: .continuous)
+                )
+                .overlay {
+                    RoundedRectangle(cornerRadius: 9, style: .continuous)
+                        .stroke(ClipFlowVisualStyle.hairlineColor)
+                }
+                .accessibilityLabel(title)
+                .help(subtitle)
+        }
+        .padding(.vertical, 3)
+    }
+}
+
 private struct SettingsSnapshot: Equatable {
     let shortcut: HotKeyShortcut
     let appearanceMode: ClipFlowAppearanceMode
@@ -656,6 +820,10 @@ private struct SettingsSnapshot: Equatable {
     let debugLoggingEnabled: Bool
     let defaultPasteMode: String
     let mainPanelOpacityPercent: Int
+    let privacyExcludedAppIdentifiers: String
+    let privacyExcludedContentPatterns: String
+    let privacyIgnoresSensitiveText: Bool
+    let smartCategorizationEnabled: Bool
     let detailFlags: [Bool]
 
     var runtimeSnapshot: AppSettingsRuntimeSnapshot {

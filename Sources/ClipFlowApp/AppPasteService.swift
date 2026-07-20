@@ -53,6 +53,23 @@ actor AppPasteService: PasteServing {
             target: target
         )
     }
+
+    func paste(text: String) async throws -> PasteOutcome {
+        guard let target else { throw AppPasteServiceError.noTargetApplication }
+        return try await coordinator.paste(
+            PasteRequest(
+                payloads: [
+                    NormalizedPayload(
+                        itemIndex: 0,
+                        type: "public.utf8-plain-text",
+                        data: Data(text.utf8)
+                    )
+                ],
+                mode: .plainText
+            ),
+            target: target
+        )
+    }
 }
 
 enum AppPasteServiceError: LocalizedError {

@@ -17,6 +17,21 @@ struct SystemClipboardPlainTextTests {
         #expect(SystemClipboard.plainText(from: [payload]) == "/Users/Clip Flow/My File.txt")
     }
 
+    @Test("Finder filename lists become filesystem paths")
+    func finderFilenameListBecomesFilesystemPath() throws {
+        let payload = NormalizedPayload(
+            itemIndex: 0,
+            type: "NSFilenamesPboardType",
+            data: try PropertyListSerialization.data(
+                fromPropertyList: ["/Users/Clip Flow/My File.txt"],
+                format: .binary,
+                options: 0
+            )
+        )
+
+        #expect(SystemClipboard.plainText(from: [payload]) == "/Users/Clip Flow/My File.txt")
+    }
+
     @Test("web URLs remain URL text")
     func webURLRemainsURLText() {
         let value = "https://example.com/a%20path"

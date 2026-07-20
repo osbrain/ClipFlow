@@ -25,6 +25,9 @@ public struct ClipboardItem: Identifiable, Codable, Equatable, Sendable {
     public let lastUsedAt: Date?
     public let customTitle: String?
     public let hasExternalPayload: Bool
+    public let recognizedText: String?
+    public let expiresAt: Date?
+    public let isOneTime: Bool
 
     public init(
         id: UUID,
@@ -40,7 +43,10 @@ public struct ClipboardItem: Identifiable, Codable, Equatable, Sendable {
         isFavorite: Bool,
         lastUsedAt: Date?,
         customTitle: String?,
-        hasExternalPayload: Bool
+        hasExternalPayload: Bool,
+        recognizedText: String? = nil,
+        expiresAt: Date? = nil,
+        isOneTime: Bool = false
     ) {
         self.id = id
         self.createdAt = createdAt
@@ -56,6 +62,9 @@ public struct ClipboardItem: Identifiable, Codable, Equatable, Sendable {
         self.lastUsedAt = lastUsedAt
         self.customTitle = customTitle
         self.hasExternalPayload = hasExternalPayload
+        self.recognizedText = recognizedText
+        self.expiresAt = expiresAt
+        self.isOneTime = isOneTime
     }
 
     public var displayTitle: String {
@@ -63,6 +72,17 @@ public struct ClipboardItem: Identifiable, Codable, Equatable, Sendable {
             return previewText
         }
         return customTitle
+    }
+
+    public var searchableText: String {
+        [searchText, recognizedText]
+            .compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+            .joined(separator: "\n")
+    }
+
+    public var isExpired: Bool {
+        expiresAt.map { $0 <= Date() } ?? false
     }
 }
 
@@ -78,4 +98,28 @@ public struct ClipCategory: Identifiable, Codable, Equatable, Sendable {
         self.createdAt = createdAt
         self.sortOrder = sortOrder
     }
+}
+
+public struct QuickPasteSlot: Identifiable, Codable, Equatable, Sendable {
+    public let index: Int
+    public let item: ClipboardItem
+
+    public init(index: Int, item: ClipboardItem) {
+        self.index = index
+        self.item = item
+    }
+
+    public var id: Int { index }
+}
+
+public struct PasteStackItem: Identifiable, Codable, Equatable, Sendable {
+    public let position: Int
+    public let item: ClipboardItem
+
+    public init(position: Int, item: ClipboardItem) {
+        self.position = position
+        self.item = item
+    }
+
+    public var id: Int { position }
 }

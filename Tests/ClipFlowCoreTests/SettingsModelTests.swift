@@ -37,6 +37,50 @@ struct SettingsModelTests {
         #expect(source.contains("https://github.com/osbrain/ClipFlow"))
     }
 
+    @Test("settings row subtitles span past trailing controls")
+    func settingsRowSubtitlesSpanPastTrailingControls() throws {
+        let sourceURL = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .appendingPathComponent("Sources/ClipFlowUI/VisualComponents.swift")
+        let source = try String(contentsOf: sourceURL, encoding: .utf8)
+
+        #expect(source.contains("VStack(alignment: .leading, spacing: 4)"))
+        #expect(source.contains("HStack(alignment: .firstTextBaseline, spacing: 12)"))
+        #expect(source.contains(".lineLimit(1)"))
+        #expect(source.contains(".truncationMode(.tail)"))
+    }
+
+    @Test("privacy rule editors use a full-width vertical form layout")
+    func privacyRuleEditorsUseVerticalFormLayout() throws {
+        let sourceURL = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .appendingPathComponent("Sources/ClipFlowUI/SettingsView.swift")
+        let source = try String(contentsOf: sourceURL, encoding: .utf8)
+
+        #expect(source.contains("PrivacyRuleEditor"))
+        #expect(source.contains(".frame(maxWidth: .infinity, minHeight: 76)"))
+        #expect(!source.contains(".frame(width: 210, height: 74)"))
+    }
+
+    @Test("settings exposes encrypted backup import and export actions")
+    func settingsExposesEncryptedBackupActions() throws {
+        let sourceURL = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .appendingPathComponent("Sources/ClipFlowUI/SettingsView.swift")
+        let source = try String(contentsOf: sourceURL, encoding: .utf8)
+
+        #expect(source.contains("settings.backup"))
+        #expect(source.contains("exportEncryptedBackup"))
+        #expect(source.contains("importEncryptedBackup"))
+        #expect(source.contains("settings.backup.help"))
+    }
+
     @Test("retention preferences have stable stored values")
     func retentionPreferencesHaveStableStoredValues() {
         #expect(RetentionPreference.day.rawValue == "day")
@@ -92,6 +136,46 @@ struct SettingsModelTests {
         #expect(!restored.showDetailFormatting)
         #expect(store.bool(forKey: "showDetailSize") == false)
         #expect(store.bool(forKey: "showDetailFormatting") == false)
+    }
+
+    @Test("privacy capture rules default safely and persist")
+    func privacyCaptureRulesPersist() {
+        let store = MemorySettingsStore()
+        let permissions = FakePermissionStatus(accessibilityTrusted: false)
+        let model = SettingsModel(store: store, permissions: permissions)
+
+        #expect(model.privacyIgnoresSensitiveText)
+        #expect(model.privacyExcludedAppIdentifiers == "")
+        #expect(model.privacyExcludedContentPatterns == "")
+
+        model.privacyExcludedAppIdentifiers = "com.apple.keychainaccess\n1Password"
+        model.privacyExcludedContentPatterns = "secret project\nregex:\\bAKIA[0-9A-Z]{16}\\b"
+        model.privacyIgnoresSensitiveText = false
+        model.save()
+
+        let restored = SettingsModel(store: store, permissions: permissions)
+        #expect(restored.privacyExcludedAppIdentifiers.contains("1Password"))
+        #expect(restored.privacyExcludedContentPatterns.contains("secret project"))
+        #expect(!restored.privacyIgnoresSensitiveText)
+        #expect(restored.privacyCapturePolicy.excludedAppIdentifiers.count == 2)
+        #expect(restored.privacyCapturePolicy.excludedContentPatterns.count == 2)
+    }
+
+    @Test("smart categorization defaults on and persists")
+    func smartCategorizationDefaultsOnAndPersists() {
+        let store = MemorySettingsStore()
+        let permissions = FakePermissionStatus(accessibilityTrusted: false)
+        let model = SettingsModel(store: store, permissions: permissions)
+
+        #expect(model.smartCategorizationEnabled)
+        #expect(model.smartCategoryPolicy.isEnabled)
+
+        model.smartCategorizationEnabled = false
+        model.save()
+
+        let restored = SettingsModel(store: store, permissions: permissions)
+        #expect(!restored.smartCategorizationEnabled)
+        #expect(!restored.smartCategoryPolicy.isEnabled)
     }
 
     @Test("settings store presence preserves persisted false values")

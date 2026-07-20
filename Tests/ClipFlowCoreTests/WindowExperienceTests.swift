@@ -33,6 +33,84 @@ struct WindowExperienceTests {
         )
     }
 
+    @Test("main panel opacity affects the background instead of all content")
+    func mainPanelOpacityAffectsBackgroundOnly() throws {
+        let rootURL = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let panelControllerSource = try String(
+            contentsOf: rootURL.appendingPathComponent(
+                "Sources/ClipFlowApp/FloatingPanelController.swift"
+            ),
+            encoding: .utf8
+        )
+        let mainPanelSource = try String(
+            contentsOf: rootURL.appendingPathComponent(
+                "Sources/ClipFlowUI/MainPanelView.swift"
+            ),
+            encoding: .utf8
+        )
+
+        #expect(!panelControllerSource.contains("alphaValue"))
+        #expect(mainPanelSource.contains("mainPanelBackground"))
+        #expect(mainPanelSource.contains("MainPanelOpacity.alphaValue"))
+        #expect(mainPanelSource.contains("forPercent: settings.mainPanelOpacityPercent"))
+    }
+
+    @Test("quick paste shortcuts use the panel's native event route")
+    func quickPasteShortcutsUseNativeEventRoute() throws {
+        let rootURL = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let panelControllerSource = try String(
+            contentsOf: rootURL.appendingPathComponent(
+                "Sources/ClipFlowApp/FloatingPanelController.swift"
+            ),
+            encoding: .utf8
+        )
+
+        #expect(panelControllerSource.contains("modifiers == [.command, .option]"))
+        #expect(panelControllerSource.contains("return PanelCommand.quickPaste(1)"))
+        #expect(panelControllerSource.contains("return PanelCommand.quickPaste(9)"))
+        #expect(panelControllerSource.contains("override func performKeyEquivalent"))
+        #expect(panelControllerSource.contains("handleQuickPasteKeyEquivalent"))
+    }
+
+    @Test("main panel uses native aurora glass visuals")
+    func mainPanelUsesNativeAuroraGlassVisuals() throws {
+        let rootURL = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let visualSource = try String(
+            contentsOf: rootURL.appendingPathComponent(
+                "Sources/ClipFlowUI/VisualComponents.swift"
+            ),
+            encoding: .utf8
+        )
+        let mainPanelSource = try String(
+            contentsOf: rootURL.appendingPathComponent(
+                "Sources/ClipFlowUI/MainPanelView.swift"
+            ),
+            encoding: .utf8
+        )
+        let detailSource = try String(
+            contentsOf: rootURL.appendingPathComponent(
+                "Sources/ClipFlowUI/DetailView.swift"
+            ),
+            encoding: .utf8
+        )
+
+        #expect(visualSource.contains("ClipFlowAuroraBackground"))
+        #expect(visualSource.contains("ClipFlowGlassSurface"))
+        #expect(visualSource.contains("ClipFlowEmptyStateView"))
+        #expect(mainPanelSource.contains("ClipFlowAuroraBackground"))
+        #expect(mainPanelSource.contains("QuickPasteEmptyStateIcon"))
+        #expect(detailSource.contains("ClipFlowEmptyStateView"))
+    }
+
     @Test("first launch protects onboarding before the panel becomes visible")
     func onboardingStartupState() {
         let state = PanelInputStateStore(isPresentingOnboarding: true)

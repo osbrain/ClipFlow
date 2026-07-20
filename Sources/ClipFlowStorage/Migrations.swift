@@ -30,6 +30,41 @@ enum Migrations {
                     bindings: [.integer(2), .real(Date().timeIntervalSince1970)]
                 )
             }
+            if current < 3 {
+                try database.execute(schemaV3)
+                try database.execute(
+                    "INSERT INTO schema_migrations(version, applied_at) VALUES (?, ?);",
+                    bindings: [.integer(3), .real(Date().timeIntervalSince1970)]
+                )
+            }
+            if current < 4 {
+                try database.execute(schemaV4)
+                try database.execute(
+                    "INSERT INTO schema_migrations(version, applied_at) VALUES (?, ?);",
+                    bindings: [.integer(4), .real(Date().timeIntervalSince1970)]
+                )
+            }
+            if current < 5 {
+                try database.execute(schemaV5)
+                try database.execute(
+                    "INSERT INTO schema_migrations(version, applied_at) VALUES (?, ?);",
+                    bindings: [.integer(5), .real(Date().timeIntervalSince1970)]
+                )
+            }
+            if current < 6 {
+                try database.execute(schemaV6)
+                try database.execute(
+                    "INSERT INTO schema_migrations(version, applied_at) VALUES (?, ?);",
+                    bindings: [.integer(6), .real(Date().timeIntervalSince1970)]
+                )
+            }
+            if current < 7 {
+                try database.execute(schemaV7)
+                try database.execute(
+                    "INSERT INTO schema_migrations(version, applied_at) VALUES (?, ?);",
+                    bindings: [.integer(7), .real(Date().timeIntervalSince1970)]
+                )
+            }
         }
     }
 
@@ -98,6 +133,46 @@ enum Migrations {
             COALESCE(last_used_at, updated_at) DESC,
             updated_at DESC
         );
+        """
+
+    private static let schemaV3 = """
+        CREATE TABLE quick_paste_slots (
+            slot_index INTEGER PRIMARY KEY CHECK(slot_index BETWEEN 1 AND 9),
+            item_id TEXT NOT NULL REFERENCES clipboard_items(id) ON DELETE CASCADE,
+            created_at REAL NOT NULL,
+            updated_at REAL NOT NULL
+        );
+        CREATE INDEX idx_quick_paste_slots_item ON quick_paste_slots(item_id);
+        """
+
+    private static let schemaV4 = """
+        CREATE TABLE paste_stack_items (
+            position INTEGER PRIMARY KEY AUTOINCREMENT,
+            item_id TEXT NOT NULL REFERENCES clipboard_items(id) ON DELETE CASCADE,
+            created_at REAL NOT NULL
+        );
+        CREATE INDEX idx_paste_stack_items_item ON paste_stack_items(item_id);
+        """
+
+    private static let schemaV5 = """
+        ALTER TABLE clipboard_items ADD COLUMN ocr_text TEXT;
+        """
+
+    private static let schemaV6 = """
+        ALTER TABLE clipboard_items ADD COLUMN expires_at REAL;
+        ALTER TABLE clipboard_items ADD COLUMN is_one_time INTEGER NOT NULL DEFAULT 0;
+        CREATE INDEX idx_items_expires_at ON clipboard_items(expires_at);
+        """
+
+    private static let schemaV7 = """
+        CREATE TABLE snippet_templates (
+            id TEXT PRIMARY KEY,
+            title TEXT NOT NULL,
+            body TEXT NOT NULL,
+            created_at REAL NOT NULL,
+            updated_at REAL NOT NULL
+        );
+        CREATE INDEX idx_snippet_templates_updated_at ON snippet_templates(updated_at DESC);
         """
 }
 

@@ -51,19 +51,18 @@ A DMG improves installation flow only. It does not make an Ad-hoc-signed app tru
 ## GitHub Release notes template
 
 ```markdown
-## ClipFlow 1.0.3
+## ClipFlow 1.0.4
 
-This release focuses on performance and release-readiness.
+This release adds safer clipboard workflows and improves the settings experience.
 
-- Deduplicates repeated clipboard captures across text, rich text, links, files, images, and fallback binary items.
-- Keeps large histories smoother by bounding default loads, batching category lookup, and avoiding whole-list reloads for duplicate captures.
-- Stops visible history rows from continuously refreshing relative time labels.
-- Adds smoke tests for 1,000-item, 10,000-item, and repeated-copy clipboard paths.
-- Refreshes README screenshots and release documentation.
+- Adds smart categorization, fixed quick-paste slots, expanded content actions, and privacy capture rules.
+- Adds encrypted backup import/export with integrity validation and import resource limits.
+- Refreshes the settings layout, background treatment, exact timestamps, and open-source entry point.
+- Improves file-path paste compatibility for Finder clipboard records.
 
 Distribution note: this build is Ad-hoc signed and not notarized. On first launch, macOS may require System Settings -> Privacy & Security -> Open Anyway. Automatic paste requires enabling ClipFlow in Accessibility.
 
-Recommended download: `ClipFlow-1.0.3-macos.dmg`
+Recommended download: `ClipFlow-1.0.4-macos.dmg`
 ```
 
 ## Future public distribution

@@ -2,6 +2,191 @@ import AppKit
 import ClipFlowCore
 import SwiftUI
 
+struct ClipFlowAuroraBackground: View {
+    let materialOpacity: Double
+
+    init(materialOpacity: Double = 1) {
+        self.materialOpacity = materialOpacity
+    }
+
+    var body: some View {
+        ZStack {
+            Rectangle()
+                .fill(.regularMaterial)
+                .opacity(materialOpacity)
+
+            LinearGradient(
+                colors: [
+                    Color.accentColor.opacity(0.16 * materialOpacity),
+                    Color.purple.opacity(0.08 * materialOpacity),
+                    Color.cyan.opacity(0.09 * materialOpacity)
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+            .blendMode(.softLight)
+
+            RadialGradient(
+                colors: [
+                    Color.accentColor.opacity(0.26 * materialOpacity),
+                    .clear
+                ],
+                center: .topLeading,
+                startRadius: 18,
+                endRadius: 420
+            )
+
+            RadialGradient(
+                colors: [
+                    Color.cyan.opacity(0.18 * materialOpacity),
+                    .clear
+                ],
+                center: .bottomTrailing,
+                startRadius: 20,
+                endRadius: 360
+            )
+
+            RadialGradient(
+                colors: [
+                    Color.purple.opacity(0.12 * materialOpacity),
+                    .clear
+                ],
+                center: .center,
+                startRadius: 40,
+                endRadius: 520
+            )
+        }
+        .allowsHitTesting(false)
+    }
+}
+
+private struct ClipFlowGlassSurface: ViewModifier {
+    let cornerRadius: CGFloat
+    let shadow: Bool
+
+    func body(content: Content) -> some View {
+        content
+            .background {
+                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                    .fill(.thinMaterial)
+                    .overlay {
+                        LinearGradient(
+                            colors: [
+                                Color.white.opacity(0.18),
+                                Color.white.opacity(0.04),
+                                Color.accentColor.opacity(0.05)
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                        .clipShape(
+                            RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                        )
+                    }
+            }
+            .overlay {
+                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                    .stroke(
+                        LinearGradient(
+                            colors: [
+                                Color.white.opacity(0.36),
+                                ClipFlowVisualStyle.hairlineColor.opacity(0.78),
+                                Color.accentColor.opacity(0.18)
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ),
+                        lineWidth: 1
+                    )
+            }
+            .shadow(
+                color: .black.opacity(shadow ? 0.08 : 0),
+                radius: shadow ? 16 : 0,
+                x: 0,
+                y: shadow ? 8 : 0
+            )
+    }
+}
+
+extension View {
+    func clipFlowGlassSurface(
+        cornerRadius: CGFloat = ClipFlowVisualStyle.cardRadius,
+        shadow: Bool = true
+    ) -> some View {
+        modifier(
+            ClipFlowGlassSurface(
+                cornerRadius: cornerRadius,
+                shadow: shadow
+            )
+        )
+    }
+}
+
+struct ClipFlowMiniEmptyStateIllustration: View {
+    private let symbol: String
+
+    init(symbol: String = "sparkles") {
+        self.symbol = symbol
+    }
+
+    var body: some View {
+        ZStack {
+            Circle()
+                .fill(Color.accentColor.opacity(0.14))
+                .frame(width: 34, height: 34)
+                .offset(x: -4, y: -3)
+
+            Circle()
+                .fill(Color.cyan.opacity(0.12))
+                .frame(width: 28, height: 28)
+                .offset(x: 7, y: 6)
+
+            RoundedRectangle(cornerRadius: 9, style: .continuous)
+                .fill(.thinMaterial)
+                .frame(width: 34, height: 28)
+                .overlay {
+                    RoundedRectangle(cornerRadius: 9, style: .continuous)
+                        .stroke(Color.white.opacity(0.34))
+                }
+
+            Image(systemName: symbol)
+                .font(.system(size: 14, weight: .semibold))
+                .symbolRenderingMode(.hierarchical)
+                .foregroundStyle(.tint)
+        }
+        .frame(width: 44, height: 38)
+        .accessibilityHidden(true)
+    }
+}
+
+struct ClipFlowEmptyStateView: View {
+    let title: String
+    let description: String
+    let symbol: String
+
+    var body: some View {
+        VStack(spacing: 12) {
+            ClipFlowMiniEmptyStateIllustration(symbol: symbol)
+                .scaleEffect(1.28)
+
+            VStack(spacing: 5) {
+                Text(title)
+                    .font(.headline)
+                    .foregroundStyle(.primary)
+                Text(description)
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+                    .lineLimit(3)
+            }
+        }
+        .padding(22)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .clipFlowGlassSurface(cornerRadius: 18)
+        .padding(ClipFlowVisualStyle.panelPadding)
+    }
+}
+
 struct GlassSection<Content: View>: View {
     private let title: String
     private let icon: String
@@ -25,14 +210,7 @@ struct GlassSection<Content: View>: View {
             content
         }
         .padding(16)
-        .background(
-            ClipFlowVisualStyle.cardFillColor,
-            in: RoundedRectangle(cornerRadius: 14)
-        )
-        .overlay {
-            RoundedRectangle(cornerRadius: 14)
-                .stroke(ClipFlowVisualStyle.hairlineColor)
-        }
+        .clipFlowGlassSurface(cornerRadius: 14)
     }
 }
 
@@ -55,36 +233,38 @@ struct GlassRow<Content: View>: View {
     }
 
     var body: some View {
-        HStack(spacing: 12) {
+        HStack(alignment: .top, spacing: 12) {
             Image(systemName: icon)
                 .font(.system(size: 16, weight: .semibold))
                 .foregroundStyle(.tint)
                 .frame(width: 24)
+                .padding(.top, 2)
                 .accessibilityHidden(true)
 
-            VStack(alignment: .leading, spacing: 2) {
-                Text(title)
-                    .font(.body)
-                    .foregroundStyle(.primary)
+            VStack(alignment: .leading, spacing: 4) {
+                HStack(alignment: .firstTextBaseline, spacing: 12) {
+                    Text(title)
+                        .font(.body)
+                        .foregroundStyle(.primary)
+                        .layoutPriority(1)
+
+                    Spacer(minLength: 12)
+                    content
+                }
+
                 if let subtitle {
                     Text(subtitle)
                         .font(.caption)
                         .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                        .truncationMode(.tail)
+                        .frame(maxWidth: .infinity, alignment: .leading)
                 }
             }
-
-            Spacer(minLength: 12)
-            content
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
         .padding(12)
-        .background(
-            ClipFlowVisualStyle.cardFillColor,
-            in: RoundedRectangle(cornerRadius: ClipFlowVisualStyle.cardRadius)
-        )
-        .overlay {
-            RoundedRectangle(cornerRadius: ClipFlowVisualStyle.cardRadius)
-                .stroke(ClipFlowVisualStyle.hairlineColor)
-        }
+        .clipFlowGlassSurface(shadow: false)
     }
 }
 
@@ -231,13 +411,6 @@ struct MetadataCard: View {
         .accessibilityElement(children: .combine)
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(12)
-        .background(
-            ClipFlowVisualStyle.cardFillColor,
-            in: RoundedRectangle(cornerRadius: ClipFlowVisualStyle.cardRadius)
-        )
-        .overlay {
-            RoundedRectangle(cornerRadius: ClipFlowVisualStyle.cardRadius)
-                .stroke(ClipFlowVisualStyle.hairlineColor)
-        }
+        .clipFlowGlassSurface(shadow: false)
     }
 }

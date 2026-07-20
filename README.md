@@ -13,6 +13,10 @@ In Simplified Chinese, the app is presented as **拾笺**.
 - Open a floating clipboard panel with `Command` + `Shift` + `V`, then paste, favorite, rename, categorize, preview, or delete an item without leaving the keyboard.
 - Use type-specific actions such as paste file, paste file path, show in Finder, open links, copy domains, and full preview.
 - Choose original-format or plain-text paste behavior.
+- Pin frequently used clips to slots `1` through `9`, then paste them globally with `Option` + `Command` + `1` through `9` even while the ClipFlow panel is closed; or queue several clips for sequential paste.
+- Recognize text in newly copied images locally with macOS Vision and search it from the same history field.
+- Mark sensitive clips as one-time or auto-expiring; temporary clips are removed after successful paste or expiry and are excluded from backups.
+- Save text clips as variable templates such as `Hello {{name}}`, fill the variables when needed, then paste the rendered text.
 - Optionally browse and activate tabs from Safari, Google Chrome, and Microsoft Edge.
 - Encrypt clipboard metadata with SQLCipher and encrypt large local payload files separately.
 - Deduplicate repeated clipboard captures and keep the history list responsive with bounded loads and static time labels.
@@ -22,7 +26,7 @@ In Simplified Chinese, the app is presented as **拾笺**.
 
 | Clipboard history | File actions |
 | --- | --- |
-| ![ClipFlow main clipboard panel in dark Simplified Chinese](docs/images/main-panel-dark-zh.png) | ![ClipFlow file entry with paste, path, open, and Finder actions](docs/images/file-actions-light-en.png) |
+| ![ClipFlow main clipboard panel with quick-paste shortcut hint in dark Simplified Chinese](docs/images/main-panel-dark-zh.png) | ![ClipFlow file entry with paste, path, open, and Finder actions](docs/images/file-actions-light-en.png) |
 
 | Settings | First-run guide |
 | --- | --- |
@@ -57,7 +61,7 @@ For GitHub Releases, use the DMG when sharing with friends:
 3. Launch ClipFlow from Applications.
 4. If macOS blocks it, open **System Settings -> Privacy & Security** and choose **Open Anyway**.
 
-The ZIP asset contains the same app bundle and is mainly useful for direct archive testing.
+When installing an update, quit ClipFlow completely before replacing the existing app in `Applications`, then launch the new copy. Automatic global quick paste requires ClipFlow to be enabled in **System Settings -> Privacy & Security -> Accessibility**.
 
 ## Build from Source
 
