@@ -229,6 +229,22 @@ struct AppModelTests {
         #expect(repository.markedUsed == [first.id])
     }
 
+    @Test("sequential paste retains its next item when automatic paste falls back to copy")
+    func pasteStackRetainsItemWhenManualPasteIsRequired() async {
+        let item = Self.item(preview: "Copy only")
+        let repository = FakeHistoryRepository(items: [item])
+        let pasteService = FakePasteService(outcome: .copiedRequiresManualPaste)
+        let model = AppModel(repository: repository, pasteService: pasteService)
+
+        await model.reload()
+        await model.addToPasteStack(item.id)
+        await model.pasteNextStackItem()
+
+        #expect(await pasteService.pastedIDs == [item.id])
+        #expect(model.pasteStack.map(\.item.id) == [item.id])
+        #expect(repository.markedUsed.isEmpty)
+    }
+
     @Test("batch paste stack adds visible selections in list order")
     func batchPasteStackAddsInListOrder() async {
         let first = Self.item(preview: "First")
@@ -742,6 +758,11 @@ private final class FakeHistoryRepository: HistoryRepository, @unchecked Sendabl
 
 private actor FakePasteService: PasteServing {
     private(set) var pasteRequests: [FakePasteRequest] = []
+    private let outcome: PasteOutcome
+
+    init(outcome: PasteOutcome = .pasted) {
+        self.outcome = outcome
+    }
 
     var pastedIDs: [UUID] {
         pasteRequests.map(\.itemID)
@@ -749,12 +770,12 @@ private actor FakePasteService: PasteServing {
 
     func paste(item: ClipboardItem) async throws -> PasteOutcome {
         pasteRequests.append(FakePasteRequest(itemID: item.id, mode: nil))
-        return .pasted
+        return outcome
     }
 
     func paste(item: ClipboardItem, mode: PasteMode) async throws -> PasteOutcome {
         pasteRequests.append(FakePasteRequest(itemID: item.id, mode: mode))
-        return .pasted
+        return outcome
     }
 }
 

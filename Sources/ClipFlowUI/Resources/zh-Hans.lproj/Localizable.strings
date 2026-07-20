@@ -55,6 +55,7 @@
 "error.action" = "无法完成%@。";
 "error.history.load" = "无法加载剪贴板历史。";
 "error.paste" = "无法粘贴所选条目。";
+"error.paste.manual" = "内容已复制。请检查辅助功能授权，或在目标应用中手动粘贴。";
 "error.favorite" = "无法更新收藏状态。";
 "error.rename" = "无法重命名所选条目。";
 "error.delete" = "无法删除所选条目。";

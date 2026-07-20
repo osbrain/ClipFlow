@@ -355,9 +355,9 @@ public final class AppModel {
         guard let item = selectedItem else { return }
 
         do {
-            lastPasteOutcome = try await pasteService.paste(item: item)
+            let outcome = try await pasteService.paste(item: item)
+            guard recordPasteOutcome(outcome) else { return }
             try recordSuccessfulPaste(of: item)
-            errorMessage = nil
             await reload()
         } catch {
             errorMessage = L10n.string("error.paste")
@@ -368,9 +368,9 @@ public final class AppModel {
         guard let item = selectedItem else { return }
 
         do {
-            lastPasteOutcome = try await pasteService.paste(item: item, mode: .plainText)
+            let outcome = try await pasteService.paste(item: item, mode: .plainText)
+            guard recordPasteOutcome(outcome) else { return }
             try recordSuccessfulPaste(of: item)
-            errorMessage = nil
             await reload()
         } catch {
             errorMessage = L10n.string("error.paste")
@@ -529,10 +529,10 @@ public final class AppModel {
         guard let entry = pasteStack.first else { return }
 
         do {
-            lastPasteOutcome = try await pasteService.paste(item: entry.item)
+            let outcome = try await pasteService.paste(item: entry.item)
+            guard recordPasteOutcome(outcome) else { return }
             try recordSuccessfulPaste(of: entry.item)
             try repository.removePasteStackItem(at: entry.position)
-            errorMessage = nil
             await reload()
         } catch {
             errorMessage = L10n.string("error.paste")
@@ -571,8 +571,7 @@ public final class AppModel {
     public func pasteTemplate(_ template: SnippetTemplate, values: [String: String]) async {
         do {
             let text = SnippetTemplateRenderer.render(template.body, values: values)
-            lastPasteOutcome = try await pasteService.paste(text: text)
-            errorMessage = nil
+            _ = recordPasteOutcome(try await pasteService.paste(text: text))
         } catch {
             errorMessage = L10n.string("error.paste")
         }
@@ -584,9 +583,9 @@ public final class AppModel {
         }
 
         do {
-            lastPasteOutcome = try await pasteService.paste(item: slot.item)
+            let outcome = try await pasteService.paste(item: slot.item)
+            guard recordPasteOutcome(outcome) else { return }
             try recordSuccessfulPaste(of: slot.item)
-            errorMessage = nil
             await reload()
         } catch {
             errorMessage = L10n.string("error.paste")
@@ -617,6 +616,18 @@ public final class AppModel {
         try repository.markUsed(item.id)
         if item.isOneTime {
             try repository.delete(item.id)
+        }
+    }
+
+    private func recordPasteOutcome(_ outcome: PasteOutcome) -> Bool {
+        lastPasteOutcome = outcome
+        switch outcome {
+        case .pasted:
+            errorMessage = nil
+            return true
+        case .copiedRequiresManualPaste:
+            errorMessage = L10n.string("error.paste.manual")
+            return false
         }
     }
 }

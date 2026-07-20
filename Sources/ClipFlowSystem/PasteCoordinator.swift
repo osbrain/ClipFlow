@@ -99,7 +99,18 @@ public struct SystemApplicationActivator: ApplicationActivating {
         ) else {
             return false
         }
-        return application.activate(options: [])
+        guard application.isActive || application.activate(options: []) else {
+            return false
+        }
+
+        for _ in 0..<20 {
+            if application.isActive {
+                try? await Task.sleep(for: .milliseconds(100))
+                return true
+            }
+            try? await Task.sleep(for: .milliseconds(25))
+        }
+        return false
     }
 }
 

@@ -55,6 +55,7 @@
 "error.action" = "Unable to complete %@.";
 "error.history.load" = "Unable to load clipboard history.";
 "error.paste" = "Unable to paste the selected item.";
+"error.paste.manual" = "Clip copied. Enable Accessibility or paste it manually in the target app.";
 "error.favorite" = "Unable to update favorite.";
 "error.rename" = "Unable to rename the selected item.";
 "error.delete" = "Unable to delete the selected item.";
