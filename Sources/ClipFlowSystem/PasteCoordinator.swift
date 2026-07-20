@@ -59,11 +59,13 @@ public struct PasteCoordinator: Sendable {
 
     public func paste(_ request: PasteRequest, target: PasteTarget) async throws -> PasteOutcome {
         try writer.write(payloads: request.payloads, mode: request.mode)
-        let activated = await activator.activate(target)
 
-        guard activated, accessibility.isTrusted else {
+        guard accessibility.isTrusted else {
             return .copiedRequiresManualPaste
         }
+
+        let activated = await activator.activate(target)
+        guard activated else { return .copiedRequiresManualPaste }
 
         try accessibility.postPaste()
         return .pasted

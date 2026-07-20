@@ -77,10 +77,11 @@ struct PasteCoordinatorTests {
     @Test("writes the clipboard when Accessibility is denied")
     func writesClipboardWhenAccessibilityIsDenied() async throws {
         let writer = FakeClipboardWriter()
+        let activator = FakeApplicationActivator()
         let coordinator = PasteCoordinator(
             writer: writer,
             accessibility: FakeAccessibility(isTrusted: false),
-            activator: FakeApplicationActivator()
+            activator: activator
         )
         let request = PasteRequest(
             payloads: [
@@ -100,6 +101,7 @@ struct PasteCoordinatorTests {
 
         #expect(writer.lastText == "hello")
         #expect(outcome == .copiedRequiresManualPaste)
+        #expect(activator.activationCount == 0)
     }
 }
 
@@ -122,6 +124,14 @@ private struct FakeAccessibility: AccessibilityPosting {
     func postPaste() throws {}
 }
 
-private struct FakeApplicationActivator: ApplicationActivating {
-    func activate(_ target: PasteTarget) async -> Bool { true }
+private final class FakeApplicationActivator: ApplicationActivating, @unchecked Sendable {
+    private let lock = NSLock()
+    private var count = 0
+
+    var activationCount: Int { lock.withLock { count } }
+
+    func activate(_ target: PasteTarget) async -> Bool {
+        lock.withLock { count += 1 }
+        return true
+    }
 }
