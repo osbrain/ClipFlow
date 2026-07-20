@@ -36,6 +36,31 @@ public enum GlobalHotKeyError: Error, Equatable, Sendable {
     case registrationFailed(OSStatus)
 }
 
+public enum GlobalHotKeyEventAction: Equatable, Sendable {
+    case togglePanel
+    case quickPaste(Int)
+    case pasteNextStackItem
+}
+
+public enum GlobalHotKeyEventRouter {
+    public static let panelSignature: UInt32 = 0x434c5046
+    public static let quickPasteSignature: UInt32 = 0x434c5150
+    public static let pasteStackSignature: UInt32 = 0x43505354
+
+    public static func action(signature: UInt32, id: UInt32) -> GlobalHotKeyEventAction? {
+        switch (signature, id) {
+        case (panelSignature, 1):
+            .togglePanel
+        case (quickPasteSignature, 1...9):
+            .quickPaste(Int(id))
+        case (pasteStackSignature, 1):
+            .pasteNextStackItem
+        default:
+            nil
+        }
+    }
+}
+
 public enum QuickPasteHotKey: CaseIterable, Equatable, Sendable {
     case slot1
     case slot2
@@ -145,7 +170,10 @@ public final class GlobalHotKeyController {
             throw GlobalHotKeyError.eventHandlerInstallationFailed(handlerStatus)
         }
 
-        let identifier = EventHotKeyID(signature: 0x434c5046, id: 1)
+        let identifier = EventHotKeyID(
+            signature: OSType(GlobalHotKeyEventRouter.panelSignature),
+            id: 1
+        )
         let registrationStatus = RegisterEventHotKey(
             shortcut.keyCode,
             shortcut.modifiers,
@@ -177,8 +205,11 @@ public final class GlobalHotKeyController {
     }
 }
 
-private let clipFlowHotKeyHandler: EventHandlerUPP = { _, _, userData in
-    guard let userData else { return OSStatus(eventNotHandledErr) }
+private let clipFlowHotKeyHandler: EventHandlerUPP = { _, event, userData in
+    guard let userData,
+          hotKeyEventAction(event) == .togglePanel else {
+        return OSStatus(eventNotHandledErr)
+    }
     let controller = Unmanaged<GlobalHotKeyController>
         .fromOpaque(userData)
         .takeUnretainedValue()
@@ -187,8 +218,6 @@ private let clipFlowHotKeyHandler: EventHandlerUPP = { _, _, userData in
     }
     return noErr
 }
-
-private let clipFlowQuickPasteHotKeySignature: OSType = 0x434c5150
 
 @MainActor
 public final class QuickPasteHotKeyController {
@@ -227,7 +256,7 @@ public final class QuickPasteHotKeyController {
 
         for shortcut in QuickPasteHotKey.allCases {
             let identifier = EventHotKeyID(
-                signature: clipFlowQuickPasteHotKeySignature,
+                signature: OSType(GlobalHotKeyEventRouter.quickPasteSignature),
                 id: UInt32(shortcut.slotIndex)
             )
             var reference: EventHotKeyRef?
@@ -265,27 +294,15 @@ public final class QuickPasteHotKeyController {
 }
 
 private let clipFlowQuickPasteHotKeyHandler: EventHandlerUPP = { _, event, userData in
-    guard let event, let userData else { return OSStatus(eventNotHandledErr) }
-    var identifier = EventHotKeyID()
-    let parameterStatus = GetEventParameter(
-        event,
-        EventParamName(kEventParamDirectObject),
-        EventParamType(typeEventHotKeyID),
-        nil,
-        MemoryLayout<EventHotKeyID>.size,
-        nil,
-        &identifier
-    )
-    guard parameterStatus == noErr,
-          identifier.signature == clipFlowQuickPasteHotKeySignature,
-          QuickPasteHotKey(slotIndex: Int(identifier.id)) != nil else {
+    guard let userData,
+          case let .quickPaste(slotIndex)? = hotKeyEventAction(event) else {
         return OSStatus(eventNotHandledErr)
     }
     let controller = Unmanaged<QuickPasteHotKeyController>
         .fromOpaque(userData)
         .takeUnretainedValue()
     Task { @MainActor in
-        controller.invoke(slotIndex: Int(identifier.id))
+        controller.invoke(slotIndex: slotIndex)
     }
     return noErr
 }
@@ -322,7 +339,10 @@ public final class PasteStackHotKeyController {
             throw GlobalHotKeyError.eventHandlerInstallationFailed(handlerStatus)
         }
 
-        let identifier = EventHotKeyID(signature: 0x43505354, id: 1)
+        let identifier = EventHotKeyID(
+            signature: OSType(GlobalHotKeyEventRouter.pasteStackSignature),
+            id: 1
+        )
         let registrationStatus = RegisterEventHotKey(
             PasteStackHotKey.next.keyCode,
             PasteStackHotKey.next.modifiers,
@@ -354,8 +374,11 @@ public final class PasteStackHotKeyController {
     }
 }
 
-private let clipFlowPasteStackHotKeyHandler: EventHandlerUPP = { _, _, userData in
-    guard let userData else { return OSStatus(eventNotHandledErr) }
+private let clipFlowPasteStackHotKeyHandler: EventHandlerUPP = { _, event, userData in
+    guard let userData,
+          hotKeyEventAction(event) == .pasteNextStackItem else {
+        return OSStatus(eventNotHandledErr)
+    }
     let controller = Unmanaged<PasteStackHotKeyController>
         .fromOpaque(userData)
         .takeUnretainedValue()
@@ -363,4 +386,23 @@ private let clipFlowPasteStackHotKeyHandler: EventHandlerUPP = { _, _, userData 
         controller.invoke()
     }
     return noErr
+}
+
+private func hotKeyEventAction(_ event: EventRef?) -> GlobalHotKeyEventAction? {
+    guard let event else { return nil }
+    var identifier = EventHotKeyID()
+    let status = GetEventParameter(
+        event,
+        EventParamName(kEventParamDirectObject),
+        EventParamType(typeEventHotKeyID),
+        nil,
+        MemoryLayout<EventHotKeyID>.size,
+        nil,
+        &identifier
+    )
+    guard status == noErr else { return nil }
+    return GlobalHotKeyEventRouter.action(
+        signature: UInt32(identifier.signature),
+        id: identifier.id
+    )
 }
