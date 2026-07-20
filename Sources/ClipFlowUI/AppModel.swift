@@ -486,6 +486,25 @@ public final class AppModel {
         }
     }
 
+    public func addToPasteStack(_ itemIDs: [UUID]) async {
+        let selectedItemIDs = Set(itemIDs)
+        let queuedItemIDs = Set(pasteStack.map(\.item.id))
+        let orderedItemIDs = items.map(\.id).filter {
+            selectedItemIDs.contains($0) && !queuedItemIDs.contains($0)
+        }
+        guard !orderedItemIDs.isEmpty else { return }
+
+        do {
+            for itemID in orderedItemIDs {
+                try repository.appendToPasteStack(itemID: itemID)
+            }
+            pasteStack = try repository.pasteStackItems()
+            errorMessage = nil
+        } catch {
+            errorMessage = L10n.string("error.pasteStack")
+        }
+    }
+
     public func removePasteStackItem(at position: Int) async {
         do {
             try repository.removePasteStackItem(at: position)

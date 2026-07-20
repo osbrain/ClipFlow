@@ -23,6 +23,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var panelController: FloatingPanelController?
     private var hotKeyController: GlobalHotKeyController?
     private var quickPasteHotKeyController: QuickPasteHotKeyController?
+    private var pasteStackHotKeyController: PasteStackHotKeyController?
     private var monitor: PasteboardMonitor?
     private var pasteService: AppPasteService?
     private var settingsCoordinator: AppSettingsCoordinator?
@@ -214,6 +215,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             )
             let hotKeyController: GlobalHotKeyController?
             let quickPasteHotKeyController: QuickPasteHotKeyController?
+            let pasteStackHotKeyController: PasteStackHotKeyController?
             if visualAcceptanceConfiguration == nil {
                 let controller = GlobalHotKeyController()
                 do {
@@ -242,9 +244,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                         )
                     }
                 }
+
+                let pasteStackController = PasteStackHotKeyController()
+                do {
+                    try pasteStackController.register { [weak self] in
+                        self?.pasteNextStackItemFromGlobalShortcut()
+                    }
+                    pasteStackHotKeyController = pasteStackController
+                } catch {
+                    pasteStackHotKeyController = nil
+                    Task {
+                        await logger.log(
+                            "paste_stack_shortcut_registration_failed",
+                            metadata: ["error": error.localizedDescription]
+                        )
+                    }
+                }
             } else {
                 hotKeyController = nil
                 quickPasteHotKeyController = nil
+                pasteStackHotKeyController = nil
             }
 
             let pasteboardMonitor: PasteboardMonitor?
@@ -286,6 +305,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             self.panelController = panelController
             self.hotKeyController = hotKeyController
             self.quickPasteHotKeyController = quickPasteHotKeyController
+            self.pasteStackHotKeyController = pasteStackHotKeyController
             self.monitor = pasteboardMonitor
             self.pasteService = pasteService
             self.settingsModel = settings
@@ -358,6 +378,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
         hotKeyController?.unregister()
         quickPasteHotKeyController?.unregister()
+        pasteStackHotKeyController?.unregister()
     }
 
     func applicationDidBecomeActive(_ notification: Notification) {
@@ -408,6 +429,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         Task {
             await pasteService.setTarget(target)
             await appModel.pasteQuickSlot(index)
+        }
+    }
+
+    private func pasteNextStackItemFromGlobalShortcut() {
+        guard let appModel else { return }
+        if panelController?.window?.isVisible == true {
+            Task { await appModel.pasteNextStackItem() }
+            return
+        }
+
+        let target = capturePasteTarget()
+        guard let pasteService else { return }
+        Task {
+            await pasteService.setTarget(target)
+            await appModel.pasteNextStackItem()
         }
     }
 

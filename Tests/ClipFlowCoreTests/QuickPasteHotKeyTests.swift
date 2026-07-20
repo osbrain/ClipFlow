@@ -10,4 +10,9 @@ struct QuickPasteHotKeyTests {
         #expect(QuickPasteHotKey(slotIndex: 9) == .slot9)
         #expect(QuickPasteHotKey(slotIndex: 10) == nil)
     }
+
+    @Test("sequential paste exposes one dedicated global shortcut")
+    func sequentialPasteShortcut() {
+        #expect(PasteStackHotKey.next.rawValue == "optionShiftCommandV")
+    }
 }

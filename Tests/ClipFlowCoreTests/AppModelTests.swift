@@ -229,6 +229,20 @@ struct AppModelTests {
         #expect(repository.markedUsed == [first.id])
     }
 
+    @Test("batch paste stack adds visible selections in list order")
+    func batchPasteStackAddsInListOrder() async {
+        let first = Self.item(preview: "First")
+        let second = Self.item(preview: "Second")
+        let third = Self.item(preview: "Third")
+        let repository = FakeHistoryRepository(items: [first, second, third])
+        let model = AppModel(repository: repository, pasteService: FakePasteService())
+
+        await model.reload()
+        await model.addToPasteStack([third.id, first.id])
+
+        #expect(model.pasteStack.map(\.item.id) == [first.id, third.id])
+    }
+
     @Test("main panel exposes quick paste strip and command shortcuts")
     func mainPanelExposesQuickPasteStrip() throws {
         let sourceURL = URL(fileURLWithPath: #filePath)

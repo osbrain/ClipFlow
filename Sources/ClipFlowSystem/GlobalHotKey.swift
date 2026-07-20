@@ -98,6 +98,13 @@ public enum QuickPasteHotKeyError: Error, Equatable, Sendable {
     case registrationFailed(OSStatus)
 }
 
+public enum PasteStackHotKey: String, Sendable {
+    case next = "optionShiftCommandV"
+
+    fileprivate var keyCode: UInt32 { UInt32(kVK_ANSI_V) }
+    fileprivate var modifiers: UInt32 { UInt32(optionKey | shiftKey | cmdKey) }
+}
+
 @MainActor
 public final class GlobalHotKeyController {
     private var hotKeyReference: EventHotKeyRef?
@@ -279,6 +286,81 @@ private let clipFlowQuickPasteHotKeyHandler: EventHandlerUPP = { _, event, userD
         .takeUnretainedValue()
     Task { @MainActor in
         controller.invoke(slotIndex: Int(identifier.id))
+    }
+    return noErr
+}
+
+@MainActor
+public final class PasteStackHotKeyController {
+    private var hotKeyReference: EventHotKeyRef?
+    private var eventHandlerReference: EventHandlerRef?
+    private var action: (@MainActor @Sendable () -> Void)?
+
+    public init() {}
+
+    isolated deinit {
+        unregister()
+    }
+
+    public func register(action: @escaping @MainActor @Sendable () -> Void) throws {
+        unregister()
+        self.action = action
+
+        var eventType = EventTypeSpec(
+            eventClass: OSType(kEventClassKeyboard),
+            eventKind: UInt32(kEventHotKeyPressed)
+        )
+        let handlerStatus = InstallEventHandler(
+            GetApplicationEventTarget(),
+            clipFlowPasteStackHotKeyHandler,
+            1,
+            &eventType,
+            Unmanaged.passUnretained(self).toOpaque(),
+            &eventHandlerReference
+        )
+        guard handlerStatus == noErr else {
+            throw GlobalHotKeyError.eventHandlerInstallationFailed(handlerStatus)
+        }
+
+        let identifier = EventHotKeyID(signature: 0x43505354, id: 1)
+        let registrationStatus = RegisterEventHotKey(
+            PasteStackHotKey.next.keyCode,
+            PasteStackHotKey.next.modifiers,
+            identifier,
+            GetApplicationEventTarget(),
+            0,
+            &hotKeyReference
+        )
+        guard registrationStatus == noErr else {
+            unregister()
+            throw GlobalHotKeyError.registrationFailed(registrationStatus)
+        }
+    }
+
+    public func unregister() {
+        if let hotKeyReference {
+            UnregisterEventHotKey(hotKeyReference)
+            self.hotKeyReference = nil
+        }
+        if let eventHandlerReference {
+            RemoveEventHandler(eventHandlerReference)
+            self.eventHandlerReference = nil
+        }
+        action = nil
+    }
+
+    fileprivate func invoke() {
+        action?()
+    }
+}
+
+private let clipFlowPasteStackHotKeyHandler: EventHandlerUPP = { _, _, userData in
+    guard let userData else { return OSStatus(eventNotHandledErr) }
+    let controller = Unmanaged<PasteStackHotKeyController>
+        .fromOpaque(userData)
+        .takeUnretainedValue()
+    Task { @MainActor in
+        controller.invoke()
     }
     return noErr
 }

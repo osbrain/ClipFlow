@@ -20,6 +20,8 @@ public struct MainPanelView: View {
     @State private var categoryName = ""
     @State private var pendingTemplate: SnippetTemplate?
     @State private var historyReloadTask: Task<Void, Never>?
+    @State private var isSelectingPasteStackItems = false
+    @State private var pasteStackSelection: Set<UUID> = []
 
     public init(
         model: AppModel,
@@ -195,6 +197,8 @@ public struct MainPanelView: View {
 
                 PasteStackStrip(
                     entries: model.pasteStack,
+                    isSelectingItems: isSelectingPasteStackItems,
+                    selectedCount: pasteStackSelection.count,
                     pasteNext: {
                         Task { await model.pasteNextStackItem() }
                     },
@@ -203,6 +207,21 @@ public struct MainPanelView: View {
                     },
                     clear: {
                         Task { await model.clearPasteStack() }
+                    },
+                    beginBatchSelection: {
+                        pasteStackSelection.removeAll()
+                        isSelectingPasteStackItems = true
+                        focusTarget = nil
+                    },
+                    cancelBatchSelection: {
+                        pasteStackSelection.removeAll()
+                        isSelectingPasteStackItems = false
+                    },
+                    addBatchSelection: {
+                        let selectedIDs = pasteStackSelection
+                        pasteStackSelection.removeAll()
+                        isSelectingPasteStackItems = false
+                        Task { await model.addToPasteStack(Array(selectedIDs)) }
                     }
                 )
 
@@ -218,6 +237,8 @@ public struct MainPanelView: View {
                     model: model,
                     rowHeight: settings.listDensity.rowHeight,
                     focusTarget: $focusTarget,
+                    isSelectingPasteStackItems: isSelectingPasteStackItems,
+                    pasteStackSelection: $pasteStackSelection,
                     beginRename: beginRename,
                     beginDelete: beginDelete
                 )
@@ -844,6 +865,8 @@ private struct HistoryCardList: View {
     @Bindable var model: AppModel
     let rowHeight: CGFloat
     @FocusState.Binding var focusTarget: PanelFocusTarget?
+    let isSelectingPasteStackItems: Bool
+    @Binding var pasteStackSelection: Set<UUID>
     let beginRename: () -> Void
     let beginDelete: () -> Void
 
@@ -865,28 +888,57 @@ private struct HistoryCardList: View {
                         LazyVStack(spacing: 8) {
                             ForEach(model.items) { item in
                                 Button {
-                                    select(item)
+                                    if isSelectingPasteStackItems {
+                                        togglePasteStackSelection(item.id)
+                                    } else {
+                                        select(item)
+                                    }
                                 } label: {
                                     HistoryCardRow(
                                         item: item,
                                         visual: model.visuals[item.id],
-                                        isSelected: model.selectedItemID == item.id,
+                                        isSelected: isSelectingPasteStackItems
+                                            ? pasteStackSelection.contains(item.id)
+                                            : model.selectedItemID == item.id,
                                         rowHeight: rowHeight
                                     )
+                                    .overlay(alignment: .topLeading) {
+                                        if isSelectingPasteStackItems {
+                                            Image(systemName: pasteStackSelection.contains(item.id)
+                                                ? "checkmark.circle.fill"
+                                                : "circle")
+                                                .font(.title3)
+                                                .foregroundStyle(
+                                                    pasteStackSelection.contains(item.id)
+                                                        ? Color.accentColor
+                                                        : Color.secondary
+                                                )
+                                                .padding(8)
+                                        }
+                                    }
                                     .accessibilityElement(children: .combine)
                                 }
                                 .buttonStyle(.plain)
                                 .id(item.id)
                                 .focused($focusTarget, equals: .history(item.id))
                                 .simultaneousGesture(TapGesture(count: 2).onEnded {
+                                    guard !isSelectingPasteStackItems else { return }
                                     select(item)
                                     Task { await model.pasteSelection() }
                                 })
                                 .accessibilityAddTraits(.isButton)
                                 .accessibilityAddTraits(
-                                    model.selectedItemID == item.id ? .isSelected : []
+                                    (isSelectingPasteStackItems
+                                        ? pasteStackSelection.contains(item.id)
+                                        : model.selectedItemID == item.id) ? .isSelected : []
                                 )
-                                .accessibilityAction { select(item) }
+                                .accessibilityAction {
+                                    if isSelectingPasteStackItems {
+                                        togglePasteStackSelection(item.id)
+                                    } else {
+                                        select(item)
+                                    }
+                                }
                                 .task(id: item.contentHash) {
                                     if item.kind == .image || item.kind == .file || item.kind == .mixed {
                                         model.requestThumbnail(for: item, maximumPixelSize: 320)
@@ -925,6 +977,14 @@ private struct HistoryCardList: View {
     private func select(_ item: ClipboardItem) {
         model.selectedItemID = item.id
         focusTarget = .history(item.id)
+    }
+
+    private func togglePasteStackSelection(_ itemID: UUID) {
+        if pasteStackSelection.contains(itemID) {
+            pasteStackSelection.remove(itemID)
+        } else {
+            pasteStackSelection.insert(itemID)
+        }
     }
 
     @ViewBuilder
@@ -1261,22 +1321,42 @@ private struct QuickPasteEmptyStateIcon: View {
 
 private struct PasteStackStrip: View {
     let entries: [PasteStackItem]
+    let isSelectingItems: Bool
+    let selectedCount: Int
     let pasteNext: () -> Void
     let remove: (Int) -> Void
     let clear: () -> Void
+    let beginBatchSelection: () -> Void
+    let cancelBatchSelection: () -> Void
+    let addBatchSelection: () -> Void
 
     var body: some View {
-        if let next = entries.first {
-            HStack(spacing: 8) {
-                Image(systemName: "rectangle.stack.fill")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(Color.accentColor)
-                    .accessibilityHidden(true)
+        HStack(spacing: 8) {
+            Image(systemName: "rectangle.stack.fill")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(Color.accentColor)
+                .accessibilityHidden(true)
 
-                Text(L10n.string("pasteStack.title"))
-                    .font(.caption.weight(.semibold))
+            Text(L10n.string("pasteStack.title"))
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
+
+            if isSelectingItems {
+                Text(L10n.format("pasteStack.selectedCount", selectedCount))
+                    .font(.caption)
                     .foregroundStyle(.secondary)
 
+                Spacer(minLength: 6)
+
+                Button(L10n.string("common.cancel"), action: cancelBatchSelection)
+                    .buttonStyle(.borderless)
+
+                Button(action: addBatchSelection) {
+                    Label(L10n.string("pasteStack.addSelected"), systemImage: "plus.circle.fill")
+                }
+                .buttonStyle(.borderless)
+                .disabled(selectedCount == 0)
+            } else if let next = entries.first {
                 Button(action: pasteNext) {
                     Label(
                         L10n.string("pasteStack.pasteNext"),
@@ -1286,6 +1366,10 @@ private struct PasteStackStrip: View {
                 }
                 .buttonStyle(.borderless)
                 .help(L10n.format("pasteStack.pasteNextHelp", next.item.displayTitle))
+
+                Text(L10n.string("pasteStack.shortcutHint"))
+                    .font(.caption2.monospaced())
+                    .foregroundStyle(.tertiary)
 
                 Image(systemName: next.item.kind.presentation.symbolName)
                     .font(.caption.weight(.semibold))
@@ -1305,6 +1389,8 @@ private struct PasteStackStrip: View {
                         .foregroundStyle(.secondary)
                 }
 
+                batchAddButton
+
                 Button {
                     remove(next.position)
                 } label: {
@@ -1318,14 +1404,30 @@ private struct PasteStackStrip: View {
                 }
                 .buttonStyle(.borderless)
                 .help(L10n.string("pasteStack.clear"))
-            }
-            .padding(.horizontal, ClipFlowVisualStyle.panelPadding)
-            .padding(.vertical, 8)
-            .background(Color.primary.opacity(0.025))
-            .overlay(alignment: .bottom) {
-                Divider()
+            } else {
+                Text(L10n.string("pasteStack.empty"))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
+                Spacer(minLength: 6)
+
+                batchAddButton
             }
         }
+        .padding(.horizontal, ClipFlowVisualStyle.panelPadding)
+        .padding(.vertical, 8)
+        .background(Color.primary.opacity(0.025))
+        .overlay(alignment: .bottom) {
+            Divider()
+        }
+    }
+
+    private var batchAddButton: some View {
+        Button(action: beginBatchSelection) {
+            Label(L10n.string("pasteStack.batchAdd"), systemImage: "checklist")
+                .font(.caption.weight(.medium))
+        }
+        .buttonStyle(.borderless)
     }
 }
 
